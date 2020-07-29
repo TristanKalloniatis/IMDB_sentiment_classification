@@ -1,17 +1,7 @@
-from torchtext.experimental.datasets import IMDB
-from torchtext.vocab import Vocab
-import torchtext
-import os
-import pickle
 import numpy as np
-
-VOCAB_SIZE = 10000
-TOKENIZER = "spacy"
-
-def save_vocab(vocab, path):
-    output = open(path, 'wb')
-    pickle.dump(vocab, output)
-    output.close()
+import data_downloader
+import data_hyperparameters
+from datetime import datetime
 
 def NB_predict(data, fitted_probs):
     words = set(data[1].tolist())
@@ -29,25 +19,12 @@ def compute_accuracy(preds, actuals):
             num_correct += 1
     return num_correct / len(preds)
 
-VOCAB_FILE = f"imdb_vocab_{TOKENIZER}_{VOCAB_SIZE}.pkl"
-tokenizer = torchtext.data.utils.get_tokenizer(TOKENIZER)
 
-if not os.path.exists(VOCAB_FILE):
-    dataset_fit_raw, dataset_test_raw = IMDB(tokenizer=tokenizer)
-    assert len(dataset_fit_raw) == 25000
-    assert len(dataset_test_raw) == 25000
-    vocab = dataset_fit_raw.get_vocab()
-    print(f"Original vocab size: {len(vocab)}")
-    new_vocab = Vocab(counter=vocab.freqs, max_size=VOCAB_SIZE)
-    save_vocab(new_vocab, VOCAB_FILE)
-else:
-    new_vocab = pickle.load(open(VOCAB_FILE, "rb"))
-
-dataset_fit, dataset_test = IMDB(tokenizer=tokenizer, vocab=new_vocab)
+vocab, dataset_fit, dataset_test = data_downloader.get_data()
 
 # First position for the number of times word has been positive.
 # Second position for the total number of times seen
-scores = np.zeros((len(new_vocab), 2))
+scores = np.zeros((data_hyperparameters.VOCAB_SIZE, 2))
 for data in dataset_fit:
     label = data[0].item()
     words = set(data[1].tolist())

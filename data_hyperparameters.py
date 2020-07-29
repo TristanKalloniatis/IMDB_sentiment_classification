@@ -1,0 +1,2 @@
+VOCAB_SIZE = 10000
+TOKENIZER = "spacy"

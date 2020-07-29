@@ -4,9 +4,9 @@ import torchtext
 import matplotlib.pyplot as plt
 import tqdm
 from sklearn.model_selection import train_test_split
+from datetime import datetime
 
-def get_data():
-    pass
+
 
 def compute_accuracy(preds, actuals):
     num_correct = 0
