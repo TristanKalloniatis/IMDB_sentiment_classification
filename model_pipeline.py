@@ -6,8 +6,6 @@ import tqdm
 from sklearn.model_selection import train_test_split
 from datetime import datetime
 
-
-
 def compute_accuracy(preds, actuals):
     num_correct = 0
     for i in range(len(preds)):
@@ -23,7 +21,7 @@ def dataloader_predict(loader, model):
             preds = preds + torch.argmax(model(xb), dim=1).tolist()
     return preds
 
-def train(model, epochs=100, train_data=loader_train, valid_data=loader_valid, loss_function=torch.nn.NLLLoss()):
+def train(model, epochs=100, train_data, valid_data, loss_function=torch.nn.NLLLoss()):
     optimiser = torch.optim.Adam(model.parameters())
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=5)
     train_losses = []
@@ -45,7 +43,7 @@ def train(model, epochs=100, train_data=loader_train, valid_data=loader_valid, l
             valid_losses.append(loss)
     return train_losses, valid_losses
 
-def evaluate_dataloder_model(model, train_data=loader_train, valid_data=loader_valid, test_data=loader_test):
+def evaluate_dataloder_model(model, train_data, valid_data, test_data):
     train_preds = dataloader_predict(train_data, model)
     valid_preds = dataloader_predict(valid_data, model)
     test_preds = dataloader_predict(test_data, model)

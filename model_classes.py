@@ -21,3 +21,7 @@ class LogisticRegressionBOW(torch.nn.Module):
     def forward(self, inputs):
         out = self.linear(inputs)
         return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
