@@ -5,8 +5,10 @@ import os
 import pickle
 import numpy as np
 
+VOCAB_SIZE = 10000
+TOKENIZER = "spacy"
+
 def save_vocab(vocab, path):
-    import pickle
     output = open(path, 'wb')
     pickle.dump(vocab, output)
     output.close()
@@ -27,11 +29,8 @@ def compute_accuracy(preds, actuals):
             num_correct += 1
     return num_correct / len(preds)
 
-VOCAB_SIZE = 10000
-TOKENIZER = "spacy"
 VOCAB_FILE = f"imdb_vocab_{TOKENIZER}_{VOCAB_SIZE}.pkl"
-
-tokenizer = torchtext.data.utils.get_tokenizer("spacy")
+tokenizer = torchtext.data.utils.get_tokenizer(TOKENIZER)
 
 if not os.path.exists(VOCAB_FILE):
     dataset_fit_raw, dataset_test_raw = IMDB(tokenizer=tokenizer)
@@ -45,7 +44,9 @@ else:
     new_vocab = pickle.load(open(VOCAB_FILE, "rb"))
 
 dataset_fit, dataset_test = IMDB(tokenizer=tokenizer, vocab=new_vocab)
-# First position for the number of times word has been positive, second position for the total number of times seen
+
+# First position for the number of times word has been positive.
+# Second position for the total number of times seen
 scores = np.zeros((len(new_vocab), 2))
 for data in dataset_fit:
     label = data[0].item()
@@ -57,9 +58,8 @@ for data in dataset_fit:
 
 probs = (1 + scores[:, 0]) / (2 + scores[:, 1])  # Laplacian smoothing
 
-dataset_fit_NB_pred = [NB_predict(data, probs) for data in dataset_fit]
-dataset_test_NB_pred = [NB_predict(data, probs) for data in dataset_test]
+dataset_fit_pred = [NB_predict(data, probs) for data in dataset_fit]
+dataset_test_pred = [NB_predict(data, probs) for data in dataset_test]
 
-fit_accuracy = compute_accuracy(dataset_fit_NB_pred, [data[0].item() for data in dataset_fit])
-
-test_accuracy = compute_accuracy(dataset_test_NB_pred, [data[0].item() for data in dataset_test])
+fit_accuracy = compute_accuracy(dataset_fit_pred, [data[0].item() for data in dataset_fit])
+test_accuracy = compute_accuracy(dataset_test_pred, [data[0].item() for data in dataset_test])
