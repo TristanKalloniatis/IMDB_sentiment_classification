@@ -3,14 +3,17 @@ import data_downloader
 import data_hyperparameters
 from datetime import datetime
 
-def NB_predict(data, fitted_probs):
-    words = set(data[1].tolist())
-    p1 = np.prod([fitted_probs[word] for word in words])
-    p0 = np.prod([1 - fitted_probs[word] for word in words])
+
+def NB_predict(dataset, fitted_probs):
+    words = set(dataset[1].tolist())
+    # Take logs for numerical stability
+    logp1 = np.sum([np.log(fitted_probs[word]) for word in words])
+    logp0 = np.sum([np.log(1 - fitted_probs[word]) for word in words])
     # No need to normalise by class probabilities as dataset is balanced
-    if p0 > p1:
+    if logp0 > logp1:
         return 0
     return 1
+
 
 def compute_accuracy(preds, actuals):
     num_correct = 0

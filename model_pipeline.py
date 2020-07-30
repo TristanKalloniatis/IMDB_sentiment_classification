@@ -6,12 +6,14 @@ import tqdm
 from sklearn.model_selection import train_test_split
 from datetime import datetime
 
+
 def compute_accuracy(preds, actuals):
     num_correct = 0
     for i in range(len(preds)):
         if preds[i] == actuals[i]:
             num_correct += 1
     return num_correct / len(preds)
+
 
 def dataloader_predict(loader, model):
     preds = []
@@ -21,7 +23,8 @@ def dataloader_predict(loader, model):
             preds = preds + torch.argmax(model(xb), dim=1).tolist()
     return preds
 
-def train(model, epochs=100, train_data, valid_data, loss_function=torch.nn.NLLLoss()):
+
+def train(model, train_data, valid_data, epochs=100, loss_function=torch.nn.NLLLoss()):
     optimiser = torch.optim.Adam(model.parameters())
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=5)
     train_losses = []
@@ -43,6 +46,7 @@ def train(model, epochs=100, train_data, valid_data, loss_function=torch.nn.NLLL
             valid_losses.append(loss)
     return train_losses, valid_losses
 
+
 def evaluate_dataloder_model(model, train_data, valid_data, test_data):
     train_preds = dataloader_predict(train_data, model)
     valid_preds = dataloader_predict(valid_data, model)
@@ -60,5 +64,7 @@ def evaluate_dataloder_model(model, train_data, valid_data, test_data):
     print('Valid accuracy: {0}'.format(compute_accuracy(valid_preds, valid_actuals)))
     print('Test accuracy: {0}'.format(compute_accuracy(test_preds, test_actuals)))
 
+
 def report_statistics():
+    # todo: report time run, time per epoch
     pass

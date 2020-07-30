@@ -18,7 +18,6 @@ def get_vocab():
         assert len(dataset_fit_raw) == 25000
         assert len(dataset_test_raw) == 25000
         vocab = dataset_fit_raw.get_vocab()
-        print(f"Original vocab size: {len(vocab)}")
         new_vocab = torchtext.vocab.Vocab(counter=vocab.freqs, max_size=VOCAB_SIZE)
         save_vocab(new_vocab, VOCAB_FILE)
     else:
@@ -61,10 +60,7 @@ def augment_dataset(dataset):
     return samples
 
 
-PAD_TOKEN = dataset_fitval.get_vocab()['<pad>']
-
-
-def pad_batch(batch):
+def pad_batch(batch, PAD_TOKEN):
     # Find max length of the batch
     max_len = max([sample[0] for sample in batch])
     ys = torch.tensor([sample[2] for sample in batch], dtype=torch.long)
@@ -75,3 +71,4 @@ def pad_batch(batch):
 
 loader_fit = torch.utils.data.DataLoader(dataset=augment_dataset(dataset_fit), batch_size=8, collate_fn=pad_batch)
 loader_val = torch.utils.data.DataLoader(dataset=augment_dataset(dataset_val), batch_size=8, collate_fn=pad_batch)
+
