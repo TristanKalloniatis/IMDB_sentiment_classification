@@ -25,6 +25,7 @@ def compute_accuracy(preds, actuals):
 
 vocab, dataset_fit, dataset_test = data_downloader.get_data()
 
+now = datetime.now()
 # First position for the number of times word has been positive.
 # Second position for the total number of times seen
 scores = np.zeros((data_hyperparameters.VOCAB_SIZE, 2))
@@ -37,6 +38,8 @@ for data in dataset_fit:
             scores[word, 0] += 1
 
 probs = (1 + scores[:, 0]) / (2 + scores[:, 1])  # Laplacian smoothing
+
+train_time = (datetime.now() - now).total_seconds()
 
 dataset_fit_pred = [NB_predict(data, probs) for data in dataset_fit]
 dataset_test_pred = [NB_predict(data, probs) for data in dataset_test]

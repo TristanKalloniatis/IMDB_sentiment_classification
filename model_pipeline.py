@@ -29,7 +29,7 @@ def train(model, train_data, valid_data, epochs=100, loss_function=torch.nn.NLLL
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=5)
     train_losses = []
     valid_losses = []
-    for epoch in tqdm.notebook.tnrange(epochs): # todo: change this
+    for epoch in tqdm.notebook.tnrange(epochs):  # todo: change this
         model.train()
         loss = 0
         for xb, yb in train_data:
@@ -65,6 +65,7 @@ def evaluate_dataloder_model(model, train_data, valid_data, test_data):
     print('Test accuracy: {0}'.format(compute_accuracy(test_preds, test_actuals)))
 
 
-def report_statistics():
-    # todo: report time run, time per epoch
+def report_statistics(model, train_data, valid_data, test_data):
+    # todo: report
+    model_data = model.get_model_data(train_data, valid_data, test_data)
     pass

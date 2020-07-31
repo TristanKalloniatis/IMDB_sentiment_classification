@@ -15,8 +15,10 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.instantiated = datetime.datetime.now()
         self.model_metadata = {}
         self.name = ''
+        self.vocab_size = data_hyperparameters.VOCAB_SIZE
+        self.tokenizer = data_hyperparameters.TOKENIZER
 
-    def evaluate(self, train_dataloader, valid_dataloader, test_dataloader):
+    def get_model_data(self, train_dataloader, valid_dataloader, test_dataloader):
         final_train_loss = self.train_losses[-1]
         final_valid_loss = self.valid_losses[-1]
         train_accuracy = 0  # todo: calculate these
@@ -28,7 +30,8 @@ class BaseModelClass(torch.nn.Module, ABC):
                       'test_accuracy': test_accuracy, 'name': self.name,
                       'total_train_time': self.train_time, 'num_epochs': self.num_epochs_trained,
                       'trainable_params': self.num_trainable_params, 'model_created': self.instantiated,
-                      'average_time_per_epoch': average_time_per_epoch}
+                      'average_time_per_epoch': average_time_per_epoch, 'vocab_size': self.vocab_size,
+                      'tokenizer': self.tokenizer}
         for key in self.model_metadata:
             model_data[key] = self.model_metadata[key]
         return model_data
@@ -38,6 +41,7 @@ class AverageEmbeddingModel(BaseModelClass, ABC):
     def __init__(self, embedding_dimension=100, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2):
         super().__init__()
         self.name = 'AVEM'
+        self.embedding_dimension = embedding_dimension
         self.embedding_mean = torch.nn.EmbeddingBag(vocab_size, embedding_dimension)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
 
