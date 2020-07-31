@@ -22,6 +22,14 @@ class BaseModelClass(torch.nn.Module, ABC):
     def count_parameters(self):
         self.num_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
 
+    def cudaify(self):
+        if torch.cuda.is_available():
+            self.cuda()
+
+    def finish_setup(self):
+        self.count_parameters()
+        self.cudaify()
+
     def get_model_performance_data(self, train_dataloader, valid_dataloader, test_dataloader):
         final_train_loss = self.train_losses[-1]
         final_valid_loss = self.valid_losses[-1]
@@ -54,12 +62,11 @@ class BaseModelClass(torch.nn.Module, ABC):
 class AverageEmbeddingModel(BaseModelClass, ABC):
     def __init__(self, embedding_dimension=100, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2):
         super().__init__()
-        self.count_parameters()
         self.name = 'AVEM'
         self.embedding_dimension = embedding_dimension
         self.embedding_mean = torch.nn.EmbeddingBag(vocab_size, embedding_dimension)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
-        self.count_parameters()
+        self.finish_setup()
 
     def forward(self, inputs):
         embeddings = self.embedding_mean(inputs)
@@ -72,7 +79,7 @@ class LogisticRegressionBOW(BaseModelClass, ABC):
         super().__init__()
         self.name = 'BOWLR'
         self.linear = torch.nn.Linear(vocab_size, num_categories)
-        self.count_parameters()
+        self.finish_setup()
 
     def forward(self, inputs):
         out = self.linear(inputs)

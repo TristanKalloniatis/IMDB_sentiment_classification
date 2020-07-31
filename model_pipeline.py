@@ -76,6 +76,6 @@ def evaluate_dataloder_model(model, train_data, valid_data, test_data):
 
 
 def report_statistics(model, train_data, valid_data, test_data):
-    # todo: report
+    # todo: report to some csv
     model_data = model.get_model_performance_data(train_data, valid_data, test_data)
-    pass
+    return model_data
