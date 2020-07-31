@@ -3,8 +3,8 @@ import numpy as np
 import torchtext
 import matplotlib.pyplot as plt
 import tqdm
-from sklearn.model_selection import train_test_split
 from datetime import datetime
+from log_utils import create_logger, write_log
 
 
 def compute_accuracy(preds, actuals):

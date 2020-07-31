@@ -49,7 +49,7 @@ def get_data():
     dataset_fit, dataset_test = torchtext.experimental.datasets.IMDB(tokenizer=tokenizer, vocab=vocab)
     write_log('Building fit and test data took {0} seconds'.format((datetime.now() - now).total_seconds()), logger)
     PAD_TOKEN = dataset_fit.get_vocab()['<pad>']
-    return vocab, PAD_TOKEN, dataset_fit, dataset_test
+    return PAD_TOKEN, dataset_fit, dataset_test
 
 
 def split_data(fit_data):
@@ -86,7 +86,7 @@ def augment_dataset(dataset):
 
 
 def get_dataloaders():
-    vocab, PAD_TOKEN, dataset_fit, dataset_test = get_data()
+    PAD_TOKEN, dataset_fit, dataset_test = get_data()
 
     def pad_batch(batch):
         # Find max length of the batch

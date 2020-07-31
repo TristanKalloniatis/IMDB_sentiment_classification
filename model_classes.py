@@ -18,7 +18,7 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.vocab_size = data_hyperparameters.VOCAB_SIZE
         self.tokenizer = data_hyperparameters.TOKENIZER
 
-    def get_model_data(self, train_dataloader, valid_dataloader, test_dataloader):
+    def get_model_performance_data(self, train_dataloader, valid_dataloader, test_dataloader):
         final_train_loss = self.train_losses[-1]
         final_valid_loss = self.valid_losses[-1]
         train_accuracy = 0  # todo: calculate these
