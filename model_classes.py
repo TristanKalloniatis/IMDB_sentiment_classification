@@ -2,6 +2,7 @@ from abc import ABC
 import torch
 import data_hyperparameters
 import datetime
+import matplotlib.pyplot as plt
 
 
 class BaseModelClass(torch.nn.Module, ABC):
@@ -11,12 +12,15 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.valid_losses = []
         self.num_epochs_trained = 0
         self.train_time = 0.
-        self.num_trainable_params = count_parameters(self)
+        self.num_trainable_params = 0
         self.instantiated = datetime.datetime.now()
         self.model_metadata = {}
         self.name = ''
         self.vocab_size = data_hyperparameters.VOCAB_SIZE
         self.tokenizer = data_hyperparameters.TOKENIZER
+
+    def count_parameters(self):
+        self.num_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def get_model_performance_data(self, train_dataloader, valid_dataloader, test_dataloader):
         final_train_loss = self.train_losses[-1]
@@ -36,14 +40,26 @@ class BaseModelClass(torch.nn.Module, ABC):
             model_data[key] = self.model_metadata[key]
         return model_data
 
+    def plot_losses(self):
+        fig, ax = plt.subplots()
+        ax.plot(range(self.num_epochs_trained), self.train_losses, label='Training')
+        ax.plot(range(self.num_epochs_trained), self.valid_losses, label='Validation')
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Loss')
+        ax.set_title('Learning curve for {0}'.format(self.name))
+        ax.legend()
+        plt.savefig('learning_curve_{0}.png'.format(self.name))
+
 
 class AverageEmbeddingModel(BaseModelClass, ABC):
     def __init__(self, embedding_dimension=100, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2):
         super().__init__()
+        self.count_parameters()
         self.name = 'AVEM'
         self.embedding_dimension = embedding_dimension
         self.embedding_mean = torch.nn.EmbeddingBag(vocab_size, embedding_dimension)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
+        self.count_parameters()
 
     def forward(self, inputs):
         embeddings = self.embedding_mean(inputs)
@@ -56,11 +72,8 @@ class LogisticRegressionBOW(BaseModelClass, ABC):
         super().__init__()
         self.name = 'BOWLR'
         self.linear = torch.nn.Linear(vocab_size, num_categories)
+        self.count_parameters()
 
     def forward(self, inputs):
         out = self.linear(inputs)
         return torch.nn.functional.log_softmax(out, dim=-1)
-
-
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
