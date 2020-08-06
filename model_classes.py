@@ -12,7 +12,7 @@ def get_accuracy(loader, model):
         model.eval()
         accuracy = 0.
         for xb, yb in loader:
-            accuracy += model(xb).argmax(dim=1).eq(yb).float().mean()
+            accuracy += model(xb).argmax(dim=1).eq(yb).float().mean().item()
     return accuracy / len(loader)
 
 
