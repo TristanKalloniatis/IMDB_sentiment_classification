@@ -3,6 +3,7 @@ import torch
 import data_hyperparameters
 import datetime
 import matplotlib
+from math import nan
 
 matplotlib.rcParams['backend'] = 'Qt5Agg'
 
@@ -25,7 +26,7 @@ def dataloader_predict(loader, model):
 
 
 class BaseModelClass(torch.nn.Module, ABC):
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__()
         self.train_losses = []
         self.valid_losses = []
@@ -33,7 +34,6 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.train_time = 0.
         self.num_trainable_params = 0
         self.instantiated = datetime.datetime.now()
-        self.model_metadata = {}
         self.name = ''
         self.vocab_size = data_hyperparameters.VOCAB_SIZE
         self.tokenizer = data_hyperparameters.TOKENIZER
@@ -50,8 +50,8 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.cudaify()
 
     def get_model_performance_data(self, train_dataloader, valid_dataloader, test_dataloader):
-        final_train_loss = self.train_losses[-1]
-        final_valid_loss = self.valid_losses[-1]
+        final_train_loss = nan if len(self.train_losses == 0) else self.train_losses[-1]
+        final_valid_loss = nan if len(self.valid_losses == 0) else self.valid_losses[-1]
         train_preds = dataloader_predict(train_dataloader, self)
         valid_preds = dataloader_predict(valid_dataloader, self)
         test_preds = dataloader_predict(test_dataloader, self)
@@ -67,7 +67,7 @@ class BaseModelClass(torch.nn.Module, ABC):
         train_accuracy = compute_accuracy(train_preds, train_actuals)
         valid_accuracy = compute_accuracy(valid_preds, valid_actuals)
         test_accuracy = compute_accuracy(test_preds, test_actuals)
-        average_time_per_epoch = self.train_time / self.num_epochs_trained
+        average_time_per_epoch = nan if self.num_epochs_trained == 0 else self.train_time / self.num_epochs_trained
         model_data = {'final_train_loss': final_train_loss, 'final_valid_loss': final_valid_loss,
                       'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy,
                       'test_accuracy': test_accuracy, 'name': self.name,
@@ -75,8 +75,6 @@ class BaseModelClass(torch.nn.Module, ABC):
                       'trainable_params': self.num_trainable_params, 'model_created': self.instantiated,
                       'average_time_per_epoch': average_time_per_epoch, 'vocab_size': self.vocab_size,
                       'tokenizer': self.tokenizer}
-        for key in self.model_metadata:
-            model_data[key] = self.model_metadata[key]
         return model_data
 
     def plot_losses(self): # todo: fix plotting as this does not currently work

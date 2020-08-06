@@ -81,7 +81,7 @@ def get_y_tensor(dataset):
     return ys
 
 
-def get_bow_dataset(dataset, vocab_size):
+def get_bow_dataset(dataset, vocab_size): # todo: test this actually works
     return torch.utils.data.TensorDataset(get_bow_tensor(dataset, vocab_size), get_y_tensor(dataset))
 
 

@@ -1,21 +1,23 @@
 import torch
 import data_hyperparameters
 from datetime import datetime
+import os
+import csv
 from log_utils import create_logger, write_log
 
 LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
+STATISTICS_FILE = 'statistics.csv'
 
 
 def train(model, train_data, valid_data, epochs=10, loss_function=torch.nn.NLLLoss()):
-    # If changing optimiser or scheduler, suggest to record this in model.model_metadata dictionary
     optimiser = torch.optim.Adam(model.parameters())
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=data_hyperparameters.PATIENCE)
     now_begin_training = datetime.now()
     start_epoch = model.num_epochs_trained
     for epoch in range(start_epoch, epochs + start_epoch):
         now_begin_epoch = datetime.now()
-        write_log('Running epoch {0} of {1}'.format(epoch, epochs), logger)
+        write_log('Running epoch {0} of {1}'.format(epoch, epochs + start_epoch - 1), logger)
         model.train()
         loss = 0.
         for xb, yb in train_data:
@@ -37,8 +39,14 @@ def train(model, train_data, valid_data, epochs=10, loss_function=torch.nn.NLLLo
     model.train_time = (datetime.now() - now_begin_training).total_seconds()
 
 
-
 def report_statistics(model, train_data, valid_data, test_data):
-    # todo: report to some csv
     model_data = model.get_model_performance_data(train_data, valid_data, test_data)
-    return model_data
+    if not os.path.isfile(STATISTICS_FILE):
+        with open(STATISTICS_FILE, 'w') as f:
+            w = csv.DictWriter(f, model_data.keys())
+            w.writeheader()
+            w.writerow(model_data)
+    else:
+        with open(STATISTICS_FILE, 'a') as f:
+            w = csv.DictWriter(f, model_data.keys())
+            w.writerow(model_data)
