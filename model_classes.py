@@ -28,6 +28,7 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.name = ''
         self.vocab_size = data_hyperparameters.VOCAB_SIZE
         self.tokenizer = data_hyperparameters.TOKENIZER
+        self.batch_size = data_hyperparameters.BATCH_SIZE
 
     def count_parameters(self):
         self.num_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -41,8 +42,8 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.cudaify()
 
     def get_model_performance_data(self, train_dataloader, valid_dataloader, test_dataloader):
-        final_train_loss = nan if len(self.train_losses == 0) else self.train_losses[-1]
-        final_valid_loss = nan if len(self.valid_losses == 0) else self.valid_losses[-1]
+        final_train_loss = nan if len(self.train_losses) == 0 else self.train_losses[-1]
+        final_valid_loss = nan if len(self.valid_losses) == 0 else self.valid_losses[-1]
         train_accuracy = get_accuracy(train_dataloader, self)
         valid_accuracy = get_accuracy(valid_dataloader, self)
         test_accuracy = get_accuracy(test_dataloader, self)
@@ -53,7 +54,7 @@ class BaseModelClass(torch.nn.Module, ABC):
                       'total_train_time': self.train_time, 'num_epochs': self.num_epochs_trained,
                       'trainable_params': self.num_trainable_params, 'model_created': self.instantiated,
                       'average_time_per_epoch': average_time_per_epoch, 'vocab_size': self.vocab_size,
-                      'tokenizer': self.tokenizer}
+                      'tokenizer': self.tokenizer, 'batch_size': self.batch_size}
         return model_data
 
     def plot_losses(self): # todo: fix plotting as this does not currently work

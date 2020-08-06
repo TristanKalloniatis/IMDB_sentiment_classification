@@ -59,7 +59,7 @@ def get_model_performance_data():
     return {'final_train_loss': nan, 'final_valid_loss': nan, 'train_accuracy': fit_accuracy, 'valid_accuracy': nan,
             'test_accuracy': test_accuracy, 'name': 'NB', 'total_train_time': train_time, 'num_epochs': 1,
             'trainable_params': len(probs), 'model_created': now, 'average_time_per_epoch': train_time,
-            'vocab_size': data_hyperparameters.VOCAB_SIZE, 'tokenizer': data_hyperparameters.TOKENIZER}
+            'vocab_size': data_hyperparameters.VOCAB_SIZE, 'tokenizer': data_hyperparameters.TOKENIZER, 'batch_size': nan}
 
 def report_statistics():
     model_data = get_model_performance_data()

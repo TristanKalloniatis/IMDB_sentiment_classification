@@ -8,6 +8,8 @@ logger = create_logger(LOG_FILE)
 
 train_data, valid_data, test_data = data_downloader.get_dataloaders()
 # Note: this will not work directly with LogisticRegressionBOW as this trains with a different dataset
+#Also should do naive Bayes separately (with naive_bayes.report_statistics() since it's based on a different paradigm
+#Usage: add models to the list below
 models = [model_classes.AverageEmbeddingModel()]
 for model in models:
     write_log('Running experiment for {0}'.format(model.name), logger)

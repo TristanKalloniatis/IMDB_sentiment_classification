@@ -17,7 +17,7 @@ def train(model, train_data, valid_data, epochs=10):
     start_epoch = model.num_epochs_trained
     for epoch in range(start_epoch, epochs + start_epoch):
         now_begin_epoch = datetime.now()
-        write_log('Running epoch {0} of {1}'.format(epoch, epochs + start_epoch - 1), logger)
+        write_log('Running epoch {0} of {1}'.format(epoch + 1, epochs + start_epoch), logger)
         model.train()
         loss = 0.
         for xb, yb in train_data:
