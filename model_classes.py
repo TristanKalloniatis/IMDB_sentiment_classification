@@ -48,13 +48,12 @@ class BaseModelClass(torch.nn.Module, ABC):
         valid_accuracy = get_accuracy(valid_dataloader, self)
         test_accuracy = get_accuracy(test_dataloader, self)
         average_time_per_epoch = nan if self.num_epochs_trained == 0 else self.train_time / self.num_epochs_trained
-        model_data = {'final_train_loss': final_train_loss, 'final_valid_loss': final_valid_loss,
-                      'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy,
-                      'test_accuracy': test_accuracy, 'name': self.name,
-                      'total_train_time': self.train_time, 'num_epochs': self.num_epochs_trained,
-                      'trainable_params': self.num_trainable_params, 'model_created': self.instantiated,
-                      'average_time_per_epoch': average_time_per_epoch, 'vocab_size': self.vocab_size,
-                      'tokenizer': self.tokenizer, 'batch_size': self.batch_size}
+        model_data = {'name': self.name, 'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy,
+                      'test_accuracy': test_accuracy, 'total_train_time': self.train_time,
+                      'num_epochs': self.num_epochs_trained, 'trainable_params': self.num_trainable_params,
+                      'final_train_loss': final_train_loss, 'final_valid_loss': final_valid_loss,
+                      'model_created': self.instantiated, 'average_time_per_epoch': average_time_per_epoch,
+                      'vocab_size': self.vocab_size, 'tokenizer': self.tokenizer, 'batch_size': self.batch_size}
         return model_data
 
     def plot_losses(self): # todo: fix plotting as this does not currently work

@@ -56,10 +56,11 @@ def get_model_performance_data():
 
     fit_accuracy = compute_accuracy(dataset_fit_pred, [data[0].item() for data in dataset_fit])
     test_accuracy = compute_accuracy(dataset_test_pred, [data[0].item() for data in dataset_test])
-    return {'final_train_loss': nan, 'final_valid_loss': nan, 'train_accuracy': fit_accuracy, 'valid_accuracy': nan,
-            'test_accuracy': test_accuracy, 'name': 'NB', 'total_train_time': train_time, 'num_epochs': 1,
-            'trainable_params': len(probs), 'model_created': now, 'average_time_per_epoch': train_time,
-            'vocab_size': data_hyperparameters.VOCAB_SIZE, 'tokenizer': data_hyperparameters.TOKENIZER, 'batch_size': nan}
+    return {'name': 'NB', 'train_accuracy': fit_accuracy, 'valid_accuracy': nan,
+            'test_accuracy': test_accuracy, 'total_train_time': train_time, 'num_epochs': 1,
+            'trainable_params': len(probs), 'final_train_loss': nan, 'final_valid_loss': nan, 'model_created': now,
+            'average_time_per_epoch': train_time, 'vocab_size': data_hyperparameters.VOCAB_SIZE,
+            'tokenizer': data_hyperparameters.TOKENIZER, 'batch_size': nan}
 
 def report_statistics():
     model_data = get_model_performance_data()
