@@ -16,6 +16,8 @@ LOG_FILE = 'data_downloader'
 logger = create_logger(LOG_FILE)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+if not os.path.exists('.data/'):
+    os.mkdir('.data/')
 
 def get_vocab():
     if not os.path.exists(VOCAB_FILE):
@@ -84,7 +86,7 @@ def get_bow_dataset(dataset, vocab_size):
 
 
 def augment_dataset(dataset):
-    samples = [(len(txt), idx, label, txt) for idx, (label, txt) in enumerate(dataset)]
+    samples = [(len(txt), idx, label.to(device), txt.to(device)) for idx, (label, txt) in enumerate(dataset)]
     samples.sort()  # sort by length to pad sequences with similar lengths
     return samples
 

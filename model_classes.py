@@ -2,7 +2,26 @@ from abc import ABC
 import torch
 import data_hyperparameters
 import datetime
-import matplotlib.pyplot as plt
+import matplotlib
+
+matplotlib.rcParams['backend'] = 'Qt5Agg'
+
+def compute_accuracy(preds, actuals):
+    num_correct = 0
+    for i in range(len(preds)):
+        if preds[i] == actuals[i]:
+            num_correct += 1
+    return num_correct / len(preds)
+
+
+def dataloader_predict(loader, model):
+    preds = []
+    with torch.no_grad():
+        model.eval()
+        for xb, _ in loader:
+            preds = preds + torch.argmax(model(xb), dim=1).tolist()
+    return preds
+
 
 
 class BaseModelClass(torch.nn.Module, ABC):
@@ -33,9 +52,21 @@ class BaseModelClass(torch.nn.Module, ABC):
     def get_model_performance_data(self, train_dataloader, valid_dataloader, test_dataloader):
         final_train_loss = self.train_losses[-1]
         final_valid_loss = self.valid_losses[-1]
-        train_accuracy = 0  # todo: calculate these
-        valid_accuracy = 0
-        test_accuracy = 0
+        train_preds = dataloader_predict(train_dataloader, self)
+        valid_preds = dataloader_predict(valid_dataloader, self)
+        test_preds = dataloader_predict(test_dataloader, self)
+        train_actuals = []
+        valid_actuals = []
+        test_actuals = []
+        for _, yb in train_dataloader:
+            train_actuals += yb.tolist()
+        for _, yb in valid_dataloader:
+            valid_actuals += yb.tolist()
+        for _, yb in test_dataloader:
+            test_actuals += yb.tolist()
+        train_accuracy = compute_accuracy(train_preds, train_actuals)
+        valid_accuracy = compute_accuracy(valid_preds, valid_actuals)
+        test_accuracy = compute_accuracy(test_preds, test_actuals)
         average_time_per_epoch = self.train_time / self.num_epochs_trained
         model_data = {'final_train_loss': final_train_loss, 'final_valid_loss': final_valid_loss,
                       'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy,
@@ -48,15 +79,15 @@ class BaseModelClass(torch.nn.Module, ABC):
             model_data[key] = self.model_metadata[key]
         return model_data
 
-    def plot_losses(self):
-        fig, ax = plt.subplots()
+    def plot_losses(self): # todo: fix plotting as this does not currently work
+        fig, ax = matplotlib.pyplot.subplots()
         ax.plot(range(self.num_epochs_trained), self.train_losses, label='Training')
         ax.plot(range(self.num_epochs_trained), self.valid_losses, label='Validation')
         ax.set_xlabel('Epoch')
         ax.set_ylabel('Loss')
         ax.set_title('Learning curve for {0}'.format(self.name))
         ax.legend()
-        plt.savefig('learning_curve_{0}.png'.format(self.name))
+        matplotlib.pyplot.savefig('learning_curve_{0}.png'.format(self.name))
 
 
 class AverageEmbeddingModel(BaseModelClass, ABC):
