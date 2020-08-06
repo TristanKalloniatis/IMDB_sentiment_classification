@@ -24,7 +24,6 @@ def dataloader_predict(loader, model):
     return preds
 
 
-
 class BaseModelClass(torch.nn.Module, ABC):
     def __init__(self, *args, **kwargs):
         super().__init__()

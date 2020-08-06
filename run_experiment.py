@@ -4,5 +4,12 @@ import data_hyperparameters
 import data_downloader
 from log_utils import create_logger, write_log
 LOG_FILE = 'run_experiment'
-
 logger = create_logger(LOG_FILE)
+
+train_data, valid_data, test_data = data_downloader.get_dataloaders()
+# Note: this will not work directly with LogisticRegressionBOW as this trains with a different dataset
+models = [model_classes.AverageEmbeddingModel()]
+for model in models:
+    write_log('Running experiment for {0}'.format(model.name), logger)
+    model_pipeline.train(model=model, train_data=train_data, valid_data=valid_data)
+    model_pipeline.report_statistics(model=model, train_data=train_data, valid_data=valid_data, test_data=test_data)

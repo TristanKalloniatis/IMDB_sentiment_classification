@@ -3,3 +3,4 @@ TOKENIZER = "spacy"
 BATCH_SIZE = 32
 TRAIN_VALID_SPLIT = 0.1
 PATIENCE = 5
+STATISTICS_FILE = 'statistics.csv'

@@ -4,6 +4,8 @@ import data_hyperparameters
 from datetime import datetime
 from log_utils import create_logger, write_log
 from math import nan
+import os
+import csv
 
 LOG_FILE = 'naive_bayes'
 logger = create_logger(LOG_FILE)
@@ -58,3 +60,15 @@ def get_model_performance_data():
             'test_accuracy': test_accuracy, 'name': 'NB', 'total_train_time': train_time, 'num_epochs': 1,
             'trainable_params': len(probs), 'model_created': now, 'average_time_per_epoch': train_time,
             'vocab_size': data_hyperparameters.VOCAB_SIZE, 'tokenizer': data_hyperparameters.TOKENIZER}
+
+def report_statistics():
+    model_data = get_model_performance_data()
+    if not os.path.isfile(data_hyperparameters.STATISTICS_FILE):
+        with open(data_hyperparameters.STATISTICS_FILE, 'w') as f:
+            w = csv.DictWriter(f, model_data.keys())
+            w.writeheader()
+            w.writerow(model_data)
+    else:
+        with open(data_hyperparameters.STATISTICS_FILE, 'a') as f:
+            w = csv.DictWriter(f, model_data.keys())
+            w.writerow(model_data)
