@@ -7,21 +7,13 @@ from math import nan
 
 matplotlib.rcParams['backend'] = 'Qt5Agg'
 
-def compute_accuracy(preds, actuals):
-    num_correct = 0
-    for i in range(len(preds)):
-        if preds[i] == actuals[i]:
-            num_correct += 1
-    return num_correct / len(preds)
-
-
-def dataloader_predict(loader, model):
-    preds = []
+def get_accuracy(loader, model):
     with torch.no_grad():
         model.eval()
-        for xb, _ in loader:
-            preds = preds + torch.argmax(model(xb), dim=1).tolist()
-    return preds
+        accuracy = 0.
+        for xb, yb in loader:
+            accuracy += model(xb).argmax(dim=1).eq(yb).float().mean()
+    return accuracy / len(loader)
 
 
 class BaseModelClass(torch.nn.Module, ABC):
@@ -51,21 +43,9 @@ class BaseModelClass(torch.nn.Module, ABC):
     def get_model_performance_data(self, train_dataloader, valid_dataloader, test_dataloader):
         final_train_loss = nan if len(self.train_losses == 0) else self.train_losses[-1]
         final_valid_loss = nan if len(self.valid_losses == 0) else self.valid_losses[-1]
-        train_preds = dataloader_predict(train_dataloader, self)
-        valid_preds = dataloader_predict(valid_dataloader, self)
-        test_preds = dataloader_predict(test_dataloader, self)
-        train_actuals = []
-        valid_actuals = []
-        test_actuals = []
-        for _, yb in train_dataloader:
-            train_actuals += yb.tolist()
-        for _, yb in valid_dataloader:
-            valid_actuals += yb.tolist()
-        for _, yb in test_dataloader:
-            test_actuals += yb.tolist()
-        train_accuracy = compute_accuracy(train_preds, train_actuals)
-        valid_accuracy = compute_accuracy(valid_preds, valid_actuals)
-        test_accuracy = compute_accuracy(test_preds, test_actuals)
+        train_accuracy = get_accuracy(train_dataloader, self)
+        valid_accuracy = get_accuracy(valid_dataloader, self)
+        test_accuracy = get_accuracy(test_dataloader, self)
         average_time_per_epoch = nan if self.num_epochs_trained == 0 else self.train_time / self.num_epochs_trained
         model_data = {'final_train_loss': final_train_loss, 'final_valid_loss': final_valid_loss,
                       'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy,
