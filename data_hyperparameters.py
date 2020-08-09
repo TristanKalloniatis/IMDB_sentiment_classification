@@ -7,3 +7,4 @@ TRAIN_VALID_SPLIT = 0.1
 PATIENCE = 5
 STATISTICS_FILE = 'statistics.csv'
 USE_CUDA = is_available()
+EMBEDDING_DIMENSION = 20

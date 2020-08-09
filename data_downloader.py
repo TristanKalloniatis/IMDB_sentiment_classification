@@ -9,7 +9,6 @@ from sklearn.model_selection import train_test_split
 
 VOCAB_SIZE = data_hyperparameters.VOCAB_SIZE
 TOKENIZER = data_hyperparameters.TOKENIZER
-
 VOCAB_FILE = f"imdb_vocab_{TOKENIZER}_{VOCAB_SIZE}.pkl"
 tokenizer = torchtext.data.utils.get_tokenizer(TOKENIZER)
 LOG_FILE = 'data_downloader'
@@ -17,6 +16,7 @@ logger = create_logger(LOG_FILE)
 
 if not os.path.exists('.data/'):
     os.mkdir('.data/')
+
 
 def get_vocab():
     if not os.path.exists(VOCAB_FILE):
@@ -80,7 +80,7 @@ def get_y_tensor(dataset):
     return ys
 
 
-def get_bow_dataset(dataset, vocab_size): # todo: test this actually works
+def get_bow_dataset(dataset, vocab_size):  # todo: test this actually works
     return torch.utils.data.TensorDataset(get_bow_tensor(dataset, vocab_size), get_y_tensor(dataset))
 
 
@@ -128,11 +128,14 @@ def get_dataloaders(bow=False, pack=False):
     else:
         if pack:
             return torch.utils.data.DataLoader(dataset=augment_dataset(dataset_train),
-                                               batch_size=data_hyperparameters.BATCH_SIZE, collate_fn=pad_batch_get_length), \
+                                               batch_size=data_hyperparameters.BATCH_SIZE,
+                                               collate_fn=pad_batch_get_length), \
                    torch.utils.data.DataLoader(dataset=augment_dataset(dataset_valid),
-                                               batch_size=data_hyperparameters.BATCH_SIZE, collate_fn=pad_batch_get_length), \
+                                               batch_size=data_hyperparameters.BATCH_SIZE,
+                                               collate_fn=pad_batch_get_length), \
                    torch.utils.data.DataLoader(dataset=augment_dataset(dataset_test),
-                                               batch_size=data_hyperparameters.BATCH_SIZE, collate_fn=pad_batch_get_length)
+                                               batch_size=data_hyperparameters.BATCH_SIZE,
+                                               collate_fn=pad_batch_get_length)
         else:
             return torch.utils.data.DataLoader(dataset=augment_dataset(dataset_train),
                                                batch_size=data_hyperparameters.BATCH_SIZE, collate_fn=pad_batch), \

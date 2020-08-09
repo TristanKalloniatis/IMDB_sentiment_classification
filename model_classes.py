@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from math import nan, log
 from model_pipeline import prepare_batch_x, prepare_batch_y
 
+
 def get_accuracy(loader, model):
     with torch.no_grad():
         model.eval()
@@ -71,7 +72,8 @@ class BaseModelClass(torch.nn.Module, ABC):
 
 
 class AverageEmbeddingModel(BaseModelClass, ABC):
-    def __init__(self, embedding_dimension=100, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='AVEM'):
+    def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='AVEM'):
         super().__init__()
         self.name = name
         self.embedding_dimension = embedding_dimension
@@ -98,12 +100,14 @@ class LogisticRegressionBOW(BaseModelClass, ABC):
 
 
 class ConvNGram(BaseModelClass, ABC):
-    def __init__(self, kernel_size, embedding_dimension=100, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='ConvN'):
+    def __init__(self, kernel_size, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='ConvN'):
         super().__init__()
         self.name = name
         self.embedding_dimension = embedding_dimension
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
-        self.conv = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=embedding_dimension, kernel_size=kernel_size)
+        self.conv = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=embedding_dimension,
+                                    kernel_size=kernel_size)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
         self.finish_setup()
 
@@ -114,6 +118,7 @@ class ConvNGram(BaseModelClass, ABC):
         pool = torch.max(conv, dim=-1)[0]
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)
+
 
 class PositionalEncoding(torch.nn.Module):
     # Taken from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
@@ -134,8 +139,11 @@ class PositionalEncoding(torch.nn.Module):
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 
+
 class TransformerEncoderLayer(BaseModelClass, ABC):
-    def __init__(self, embedding_dimension=100, nhead=4, dim_feedforward=1024, vocab_size=data_hyperparameters.VOCAB_SIZE, pool_type='last', num_categories=2, name='TransformerEncoderLayer'):
+    def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4, dim_feedforward=1024,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE, pool_type='last', num_categories=2,
+                 name='TransformerEncoderLayer'):
         super().__init__()
         assert embedding_dimension % nhead == 0
         self.name = name
@@ -143,7 +151,8 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
         self.pool_type = pool_type
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.positional_encoder = PositionalEncoding(embedding_dimension)
-        self.encoder_layer = torch.nn.TransformerEncoderLayer(d_model=embedding_dimension, nhead=nhead, dim_feedforward=dim_feedforward)
+        self.encoder_layer = torch.nn.TransformerEncoderLayer(d_model=embedding_dimension, nhead=nhead,
+                                                              dim_feedforward=dim_feedforward)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
         self.finish_setup()
 
