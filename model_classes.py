@@ -2,17 +2,16 @@ from abc import ABC
 import torch
 import data_hyperparameters
 import datetime
-import matplotlib
-from math import nan
-
-matplotlib.rcParams['backend'] = 'Qt5Agg'
+import matplotlib.pyplot as plt
+from math import nan, log
+from model_pipeline import prepare_batch_x, prepare_batch_y
 
 def get_accuracy(loader, model):
     with torch.no_grad():
         model.eval()
         accuracy = 0.
         for xb, yb in loader:
-            accuracy += model(xb).argmax(dim=1).eq(yb).float().mean().item()
+            accuracy += model(prepare_batch_x(xb)).argmax(dim=1).eq(prepare_batch_y(yb)).float().mean().item()
     return accuracy / len(loader)
 
 
@@ -34,8 +33,12 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.num_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def cudaify(self):
-        if torch.cuda.is_available():
+        if data_hyperparameters.USE_CUDA:
             self.cuda()
+
+    def free(self):
+        if data_hyperparameters.USE_CUDA:
+            self.cpu()
 
     def finish_setup(self):
         self.count_parameters()
@@ -56,21 +59,21 @@ class BaseModelClass(torch.nn.Module, ABC):
                       'vocab_size': self.vocab_size, 'tokenizer': self.tokenizer, 'batch_size': self.batch_size}
         return model_data
 
-    def plot_losses(self): # todo: fix plotting as this does not currently work
-        fig, ax = matplotlib.pyplot.subplots()
+    def plot_losses(self):
+        fig, ax = plt.subplots()
         ax.plot(range(self.num_epochs_trained), self.train_losses, label='Training')
         ax.plot(range(self.num_epochs_trained), self.valid_losses, label='Validation')
         ax.set_xlabel('Epoch')
         ax.set_ylabel('Loss')
         ax.set_title('Learning curve for {0}'.format(self.name))
         ax.legend()
-        matplotlib.pyplot.savefig('learning_curve_{0}.png'.format(self.name))
+        plt.savefig('learning_curve_{0}.png'.format(self.name))
 
 
 class AverageEmbeddingModel(BaseModelClass, ABC):
-    def __init__(self, embedding_dimension=100, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2):
+    def __init__(self, embedding_dimension=100, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='AVEM'):
         super().__init__()
-        self.name = 'AVEM'
+        self.name = name
         self.embedding_dimension = embedding_dimension
         self.embedding_mean = torch.nn.EmbeddingBag(vocab_size, embedding_dimension)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
@@ -83,12 +86,72 @@ class AverageEmbeddingModel(BaseModelClass, ABC):
 
 
 class LogisticRegressionBOW(BaseModelClass, ABC):
-    def __init__(self, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2):
+    def __init__(self, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='BOWLR'):
         super().__init__()
-        self.name = 'BOWLR'
+        self.name = name
         self.linear = torch.nn.Linear(vocab_size, num_categories)
         self.finish_setup()
 
     def forward(self, inputs):
         out = self.linear(inputs)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class ConvNGram(BaseModelClass, ABC):
+    def __init__(self, kernel_size, embedding_dimension=100, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='ConvN'):
+        super().__init__()
+        self.name = name
+        self.embedding_dimension = embedding_dimension
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.conv = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=embedding_dimension, kernel_size=kernel_size)
+        self.linear = torch.nn.Linear(embedding_dimension, num_categories)
+        self.finish_setup()
+
+    def forward(self, inputs):
+        sequence_length = inputs.shape[1]
+        embeds = self.embedding(inputs).view(-1, self.embedding_dimension, sequence_length)
+        conv = self.conv(embeds)
+        pool = torch.max(conv, dim=-1)[0]
+        out = self.linear(pool)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+class PositionalEncoding(torch.nn.Module):
+    # Taken from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
+    def __init__(self, d_model, dropout=0.1, max_len=1000):
+        assert d_model % 2 == 0
+        super().__init__()
+        self.dropout = torch.nn.Dropout(p=dropout)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        # [T, B, d_model] -> [T, B, d_model]
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
+
+class TransformerEncoderLayer(BaseModelClass, ABC):
+    def __init__(self, embedding_dimension=100, nhead=4, dim_feedforward=1024, vocab_size=data_hyperparameters.VOCAB_SIZE, pool_type='last', num_categories=2, name='TransformerEncoderLayer'):
+        super().__init__()
+        assert embedding_dimension % nhead == 0
+        self.name = name
+        self.embedding_dimension = embedding_dimension
+        self.pool_type = pool_type
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.positional_encoder = PositionalEncoding(embedding_dimension)
+        self.encoder_layer = torch.nn.TransformerEncoderLayer(d_model=embedding_dimension, nhead=nhead, dim_feedforward=dim_feedforward)
+        self.linear = torch.nn.Linear(embedding_dimension, num_categories)
+        self.finish_setup()
+
+    def forward(self, inputs):
+        sequence_length = inputs.shape[1]
+        embeds = self.embedding(inputs).view(sequence_length, -1, self.embedding_dimension)
+        positional_encodings = self.positional_encoder(embeds)
+        transforms = self.encoder_layer(positional_encodings)
+        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0]
+        out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)

@@ -8,6 +8,22 @@ from log_utils import create_logger, write_log
 LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
 
+device = torch.device('cuda' if data_hyperparameters.USE_CUDA else 'cpu')
+
+def prepare_batch_x(xb):
+    if isinstance(xb, tuple):
+        transformed_components = []
+        for i in range(len(xb)):
+            transformed_components.append(xb[i].to(device))
+        xb = tuple(transformed_components)
+    else:
+        xb = xb.to(device)
+    return xb
+
+def prepare_batch_y(yb):
+    yb = yb.to(device)
+    return yb
+
 
 def train(model, train_data, valid_data, epochs=10):
     loss_function = torch.nn.NLLLoss()
@@ -21,7 +37,7 @@ def train(model, train_data, valid_data, epochs=10):
         model.train()
         loss = 0.
         for xb, yb in train_data:
-            batch_loss = loss_function(model(xb), yb)
+            batch_loss = loss_function(model(prepare_batch_x(xb)), prepare_batch_y(yb))
             optimiser.zero_grad()
             batch_loss.backward()
             optimiser.step()
@@ -30,7 +46,7 @@ def train(model, train_data, valid_data, epochs=10):
         write_log('Training loss: {0}'.format(loss), logger)
         model.eval()
         with torch.no_grad():
-            loss = sum([loss_function(model(xb), yb).item() for xb, yb in valid_data]) / len(valid_data)
+            loss = sum([loss_function(model(prepare_batch_x(xb)), prepare_batch_y(yb)).item() for xb, yb in valid_data]) / len(valid_data)
             scheduler.step(loss)
             model.valid_losses.append(loss)
             write_log('Validation loss: {0}'.format(loss), logger)
