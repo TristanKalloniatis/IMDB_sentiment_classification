@@ -13,7 +13,7 @@ def train(model, train_data, valid_data, epochs=10):
     loss_function = torch.nn.NLLLoss()
     if data_hyperparameters.USE_CUDA:
         model.cuda()
-    optimiser = torch.optim.Adam(model.parameters())
+    optimiser = torch.optim.Adam(model.parameters()) if model.latest_scheduled_lr is None else torch.optim.Adam(model.parameters(), lr=model.latest_scheduled_lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=data_hyperparameters.PATIENCE)
     now_begin_training = datetime.now()
     start_epoch = model.num_epochs_trained
@@ -22,8 +22,7 @@ def train(model, train_data, valid_data, epochs=10):
         write_log('Running epoch {0} of {1}'.format(epoch + 1, epochs + start_epoch), logger)
         model.train()
         loss = 0.
-        for bidx, (xb, yb) in enumerate(train_data):
-            print(bidx)
+        for xb, yb in train_data:
             if data_hyperparameters.USE_CUDA:
                 yb = yb.cuda()
                 xb = (x.cuda() for x in xb) if isinstance(xb, tuple) else xb.cuda()

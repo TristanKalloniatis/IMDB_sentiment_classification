@@ -1,5 +1,3 @@
-CUDA_LAUNCH_BLOCKING="1"
-
 import model_classes
 import model_pipeline
 import data_hyperparameters
@@ -12,7 +10,7 @@ train_data, valid_data, test_data = data_downloader.get_dataloaders()
 # Note: this will not work directly with LogisticRegressionBOW as this trains with a different dataset
 #Also should do naive Bayes separately (with naive_bayes.report_statistics() since it's based on a different paradigm
 #Usage: add models to the list below
-models = [model_classes.ConvNGram(2, name='Conv2'), model_classes.ConvNGram(3, name='Conv3'), model_classes.TransformerEncoderLayer()]
+models = [model_classes.TransformerEncoderLayer(max_len=100, name='TransformerEncoderLayer_100')]
 for model in models:
     write_log('Running experiment for {0}'.format(model.name), logger)
     model_pipeline.train(model=model, train_data=train_data, valid_data=valid_data)
