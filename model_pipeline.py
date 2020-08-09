@@ -7,27 +7,12 @@ from log_utils import create_logger, write_log
 
 LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
-device = torch.device('cuda' if data_hyperparameters.USE_CUDA else 'cpu')
-
-
-def prepare_batch_x(xb):
-    if isinstance(xb, tuple):
-        transformed_components = []
-        for i in range(len(xb)):
-            transformed_components.append(xb[i].to(device))
-        xb_ = tuple(transformed_components)
-    else:
-        xb_ = xb.to(device)
-    return xb_
-
-
-def prepare_batch_y(yb):
-    yb_ = yb.to(device)
-    return yb_
 
 
 def train(model, train_data, valid_data, epochs=10):
     loss_function = torch.nn.NLLLoss()
+    if data_hyperparameters.USE_CUDA:
+        model.cuda()
     optimiser = torch.optim.Adam(model.parameters())
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=data_hyperparameters.PATIENCE)
     now_begin_training = datetime.now()
@@ -37,25 +22,36 @@ def train(model, train_data, valid_data, epochs=10):
         write_log('Running epoch {0} of {1}'.format(epoch + 1, epochs + start_epoch), logger)
         model.train()
         loss = 0.
-        for xb, yb in train_data:
-            batch_loss = loss_function(model(prepare_batch_x(xb)), prepare_batch_y(yb))
+        for bidx, (xb, yb) in enumerate(train_data):
+            print(bidx)
+            if data_hyperparameters.USE_CUDA:
+                yb = yb.cuda()
+                xb = (x.cuda() for x in xb) if isinstance(xb, tuple) else xb.cuda()
+            outputs = model(xb)
+            batch_loss = loss_function(outputs, yb)
+            loss += batch_loss.item() / len(train_data)
             optimiser.zero_grad()
             batch_loss.backward()
             optimiser.step()
-            loss += batch_loss.item() / len(train_data)
         model.train_losses.append(loss)
         write_log('Training loss: {0}'.format(loss), logger)
         model.eval()
         with torch.no_grad():
-            loss = sum(
-                [loss_function(model(prepare_batch_x(xb)), prepare_batch_y(yb)).item() for xb, yb in valid_data]) / len(
-                valid_data)
-            scheduler.step(loss)
-            model.valid_losses.append(loss)
-            write_log('Validation loss: {0}'.format(loss), logger)
+            loss = 0.
+            for xb, yb in valid_data:
+                if data_hyperparameters.USE_CUDA:
+                    yb = yb.cuda()
+                    xb = (x.cuda() for x in xb) if isinstance(xb, tuple) else xb.cuda()
+                outputs = model(xb)
+                loss += loss_function(outputs, yb).item() / len(valid_data)
+        model.valid_losses.append(loss)
+        scheduler.step(loss)
+        write_log('Validation loss: {0}'.format(loss), logger)
         model.num_epochs_trained += 1
         write_log('Epoch took {0} seconds'.format((datetime.now() - now_begin_epoch).total_seconds()), logger)
     model.train_time += (datetime.now() - now_begin_training).total_seconds()
+    if data_hyperparameters.USE_CUDA:
+        model.cpu()
 
 
 def report_statistics(model, train_data, valid_data, test_data):

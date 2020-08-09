@@ -4,15 +4,20 @@ import data_hyperparameters
 import datetime
 import matplotlib.pyplot as plt
 from math import nan, log
-from model_pipeline import prepare_batch_x, prepare_batch_y
 
 
 def get_accuracy(loader, model):
+    if data_hyperparameters.USE_CUDA:
+        model.cuda()
+    model.eval()
     with torch.no_grad():
-        model.eval()
         accuracy = 0.
         for xb, yb in loader:
-            accuracy += model(prepare_batch_x(xb)).argmax(dim=1).eq(prepare_batch_y(yb)).float().mean().item()
+            if data_hyperparameters.USE_CUDA:
+                yb = yb.cuda()
+                xb = (x.cuda() for x in xb) if isinstance(xb, tuple) else xb.cuda()
+            outputs = model(xb)
+            accuracy += outputs.argmax(dim=1).eq(yb).float().mean()
     return accuracy / len(loader)
 
 
@@ -33,17 +38,8 @@ class BaseModelClass(torch.nn.Module, ABC):
     def count_parameters(self):
         self.num_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def cudaify(self):
-        if data_hyperparameters.USE_CUDA:
-            self.cuda()
-
-    def free(self):
-        if data_hyperparameters.USE_CUDA:
-            self.cpu()
-
     def finish_setup(self):
         self.count_parameters()
-        self.cudaify()
 
     def get_model_performance_data(self, train_dataloader, valid_dataloader, test_dataloader):
         final_train_loss = nan if len(self.train_losses) == 0 else self.train_losses[-1]
