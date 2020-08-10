@@ -4,12 +4,13 @@ from datetime import datetime
 import os
 import csv
 from log_utils import create_logger, write_log
+from model_classes import get_accuracy
 
 LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
 
 
-def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, patience=data_hyperparameters.PATIENCE):
+def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, patience=data_hyperparameters.PATIENCE, report_accuracy_every=None):
     loss_function = torch.nn.NLLLoss()
     if data_hyperparameters.USE_CUDA:
         model.cuda()
@@ -35,6 +36,10 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
             optimiser.step()
         model.train_losses.append(loss)
         write_log('Training loss: {0}'.format(loss), logger)
+        if report_accuracy_every is not None:
+            if epoch + 1 % report_accuracy_every == 0:
+                accuracy = get_accuracy(train_data, model)
+                write_log('Training accuracy: {0}'.format(accuracy), logger)
         model.eval()
         with torch.no_grad():
             loss = 0.
@@ -47,6 +52,10 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
         model.valid_losses.append(loss)
         scheduler.step(loss)
         write_log('Validation loss: {0}'.format(loss), logger)
+        if report_accuracy_every is not None:
+            if epoch + 1 % report_accuracy_every == 0:
+                accuracy = get_accuracy(valid_data, model)
+                write_log('Validation accuracy: {0}'.format(accuracy), logger)
         model.num_epochs_trained += 1
         write_log('Epoch took {0} seconds'.format((datetime.now() - now_begin_epoch).total_seconds()), logger)
     model.train_time += (datetime.now() - now_begin_training).total_seconds()
