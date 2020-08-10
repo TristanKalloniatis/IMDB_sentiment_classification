@@ -70,7 +70,7 @@ class BaseModelClass(torch.nn.Module, ABC):
 
 class AverageEmbeddingModel(BaseModelClass, ABC):
     def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='AVEM'):
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_categories=2, name='AVEM'):
         super().__init__()
         self.name = name
         self.embedding_dimension = embedding_dimension
@@ -98,19 +98,18 @@ class LogisticRegressionBOW(BaseModelClass, ABC):
 
 class ConvNGram(BaseModelClass, ABC):
     def __init__(self, kernel_size, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='ConvN'):
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_features=100, num_categories=2, name='ConvN'):
         super().__init__()
         self.name = name
         self.embedding_dimension = embedding_dimension
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
-        self.conv = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=embedding_dimension,
+        self.conv = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=num_features,
                                     kernel_size=kernel_size)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
         self.finish_setup()
 
     def forward(self, inputs):
-        sequence_length = inputs.shape[1]
-        embeds = self.embedding(inputs).view(-1, self.embedding_dimension, sequence_length)
+        embeds = self.embedding(inputs).transpose(1, 2)
         conv = self.conv(embeds)
         pool = torch.max(conv, dim=-1)[0]
         out = self.linear(pool)
@@ -118,7 +117,7 @@ class ConvNGram(BaseModelClass, ABC):
 
 
 class ConvMultiGram(BaseModelClass, ABC):
-    def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25, vocab_size=data_hyperparameters.VOCAB_SIZE, num_features=100, num_categories=2, name='ConvMultiGram'):
+    def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25, vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_features=100, num_categories=2, name='ConvMultiGram'):
         super().__init__()
         self.name = name
         self.embedding_dimension = embedding_dimension
@@ -131,8 +130,7 @@ class ConvMultiGram(BaseModelClass, ABC):
         self.finish_setup()
 
     def forward(self, inputs):
-        sequence_length = inputs.shape[1]
-        embeds = self.embedding(inputs).view(-1, self.embedding_dimension, sequence_length)
+        embeds = self.embedding(inputs).transpose(1, 2)
         dropped_embeds = self.dropout(embeds)
         conv2 = self.conv2(dropped_embeds)
         conv3 = self.conv3(dropped_embeds)
@@ -144,6 +142,54 @@ class ConvMultiGram(BaseModelClass, ABC):
         out = self.linear(pool_dropout)
         return torch.nn.functional.log_softmax(out, dim=-1)
 
+
+class GRUClassifier(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=100, hidden_size=100, bidirectional=False,
+                 num_categories=2, name='GRU'):
+        super().__init__()
+        self.bidirectional = bidirectional
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size_scaled = hidden_size * 2 if bidirectional else hidden_size
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                                bidirectional=bidirectional, batch_first=True)
+        self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len]
+        embeds = self.embedding(input_truncated)
+        gru_output, _ = self.GRU(embeds)
+        gru_final_output = gru_output[:, -1, :]
+        out = self.linear(gru_final_output)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+class LSTMClassifier(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=100, hidden_size=100, bidirectional=False,
+                 num_categories=2, name='LSTM'):
+        super().__init__()
+        self.bidirectional = bidirectional
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size_scaled = hidden_size * 2 if bidirectional else hidden_size
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                                  bidirectional=bidirectional, batch_first=True)
+        self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len]
+        embeds = self.embedding(input_truncated)
+        lstm_output, _ = self.LSTM(embeds)
+        lstm_final_output = lstm_output[:, -1, :]
+        out = self.linear(lstm_final_output)
+        return torch.nn.functional.log_softmax(out, dim=-1)
 
 class PositionalEncoding(torch.nn.Module):
     # Modified from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
@@ -167,7 +213,7 @@ class PositionalEncoding(torch.nn.Module):
 
 class TransformerEncoderLayer(BaseModelClass, ABC):
     def __init__(self, max_len, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4, dim_feedforward=1024,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE, pool_type='last', num_categories=2,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='last', num_categories=2,
                  name='TransformerEncoderLayer'):
         super().__init__()
         assert embedding_dimension % nhead == 0
@@ -184,10 +230,9 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
 
     def forward(self, inputs):
         input_truncated = inputs[:, :self.max_len]
-        sequence_length = input_truncated.shape[1]
-        embeds = self.embedding(input_truncated).view(sequence_length, -1, self.embedding_dimension)
+        embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
         transforms = self.encoder_layer(positional_encodings)
-        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0]
+        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0] # todo: try mean?
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)

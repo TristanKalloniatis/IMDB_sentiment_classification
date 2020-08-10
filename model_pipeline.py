@@ -9,12 +9,12 @@ LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
 
 
-def train(model, train_data, valid_data, epochs=10):
+def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, patience=data_hyperparameters.PATIENCE):
     loss_function = torch.nn.NLLLoss()
     if data_hyperparameters.USE_CUDA:
         model.cuda()
     optimiser = torch.optim.Adam(model.parameters()) if model.latest_scheduled_lr is None else torch.optim.Adam(model.parameters(), lr=model.latest_scheduled_lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=data_hyperparameters.PATIENCE)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=patience)
     now_begin_training = datetime.now()
     start_epoch = model.num_epochs_trained
     for epoch in range(start_epoch, epochs + start_epoch):

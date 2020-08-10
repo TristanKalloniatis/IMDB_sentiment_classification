@@ -8,3 +8,4 @@ PATIENCE = 5
 STATISTICS_FILE = 'statistics.csv'
 USE_CUDA = is_available()
 EMBEDDING_DIMENSION = 100
+EPOCHS = 10
