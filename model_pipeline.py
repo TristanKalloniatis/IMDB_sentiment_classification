@@ -21,6 +21,7 @@ def train(model, train_data, valid_data, epochs=10):
         now_begin_epoch = datetime.now()
         write_log('Running epoch {0} of {1}'.format(epoch + 1, epochs + start_epoch), logger)
         model.train()
+        model.latest_scheduled_lr = optimiser.param_groups[0]['lr']
         loss = 0.
         for xb, yb in train_data:
             if data_hyperparameters.USE_CUDA:
