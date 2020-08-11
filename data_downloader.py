@@ -91,7 +91,7 @@ def augment_dataset(dataset):
     return samples
 
 
-def get_dataloaders(bow=False, pack=False):
+def get_dataloaders(batch_size=data_hyperparameters.BATCH_SIZE, bow=False, pack=False):
     PAD_TOKEN, dataset_fit, dataset_test = get_data()
 
     def pad_batch(batch):
@@ -120,17 +120,15 @@ def get_dataloaders(bow=False, pack=False):
     dataset_train, dataset_valid = split_data(dataset_fit)
     if bow:
         vocab = len(dataset_fit.get_vocab())
-        return torch.utils.data.DataLoader(dataset=get_bow_dataset(dataset_train, vocab),
-                                           batch_size=data_hyperparameters.BATCH_SIZE, shuffle=True), \
-               torch.utils.data.DataLoader(dataset=get_bow_dataset(dataset_valid, vocab),
-                                           batch_size=data_hyperparameters.BATCH_SIZE), \
-               torch.utils.data.DataLoader(dataset=get_bow_dataset(dataset_test, vocab),
-                                           batch_size=data_hyperparameters.BATCH_SIZE)
+        return torch.utils.data.DataLoader(dataset=get_bow_dataset(dataset_train, vocab), batch_size=batch_size,
+                                           shuffle=True), \
+               torch.utils.data.DataLoader(dataset=get_bow_dataset(dataset_valid, vocab), batch_size=batch_size), \
+               torch.utils.data.DataLoader(dataset=get_bow_dataset(dataset_test, vocab), batch_size=batch_size)
     else:
         collate_fn = pad_batch_get_length if pack else pad_batch
-        return torch.utils.data.DataLoader(dataset=augment_dataset(dataset_train),
-                                           batch_size=data_hyperparameters.BATCH_SIZE, collate_fn=collate_fn), \
-               torch.utils.data.DataLoader(dataset=augment_dataset(dataset_valid),
-                                           batch_size=data_hyperparameters.BATCH_SIZE, collate_fn=collate_fn), \
-               torch.utils.data.DataLoader(dataset=augment_dataset(dataset_test),
-                                           batch_size=data_hyperparameters.BATCH_SIZE, collate_fn=collate_fn)
+        return torch.utils.data.DataLoader(dataset=augment_dataset(dataset_train), batch_size=batch_size,
+                                           collate_fn=collate_fn), \
+               torch.utils.data.DataLoader(dataset=augment_dataset(dataset_valid), batch_size=batch_size,
+                                           collate_fn=collate_fn), \
+               torch.utils.data.DataLoader(dataset=augment_dataset(dataset_test), batch_size=batch_size,
+                                           collate_fn=collate_fn)
