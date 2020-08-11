@@ -14,5 +14,5 @@ models = [model_classes.TransformerEncoderLayer(max_len=100, name='TransformerEn
 for model in models:
     write_log('Running experiment for {0}'.format(model.name), logger)
     model_pipeline.train(model=model, train_data=train_data, valid_data=valid_data)
-    model_pipeline.report_statistics(model=model, train_data=train_data, valid_data=valid_data, test_data=test_data)
     model.plot_losses()
+    model_pipeline.report_statistics(model=model, train_data=train_data, valid_data=valid_data, test_data=test_data)

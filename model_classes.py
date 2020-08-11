@@ -13,11 +13,7 @@ def get_accuracy(loader, model):
     with torch.no_grad():
         accuracy = 0.
         for xb, yb in loader:
-            if data_hyperparameters.USE_CUDA:
-                yb = yb.cuda()
-                xb = (x.cuda() for x in xb) if isinstance(xb, tuple) else xb.cuda()
-            outputs = model(xb)
-            accuracy += outputs.argmax(dim=1).eq(yb).float().mean().item()
+            accuracy += model(xb).argmax(dim=1).eq(yb).float().mean().item()
     return accuracy / len(loader)
 
 
@@ -35,6 +31,8 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.vocab_size = data_hyperparameters.VOCAB_SIZE
         self.tokenizer = data_hyperparameters.TOKENIZER
         self.batch_size = data_hyperparameters.BATCH_SIZE
+        self.train_accuracies = {}
+        self.valid_accuracies = {}
 
     def count_parameters(self):
         self.num_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -145,7 +143,7 @@ class ConvMultiGram(BaseModelClass, ABC):
 
 class GRUClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=200, hidden_size=100, bidirectional=False,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, hidden_size=100, bidirectional=False,
                  num_categories=2, name='GRU'):
         super().__init__()
         self.bidirectional = bidirectional
@@ -162,10 +160,20 @@ class GRUClassifier(BaseModelClass, ABC):
         self.finish_setup()
 
     def forward(self, inputs):
-        input_truncated = inputs[:, :self.max_len]
-        embeds = self.embedding(input_truncated)
-        dropped_embeds = self.dropout(embeds)
-        gru_output, _ = self.GRU(dropped_embeds)
+        if isinstance(inputs, tuple):
+            x, x_length = inputs
+            x_truncated = x[:, :self.max_len] if self.max_len is not None else x
+            x_length_truncated = x_length[:, :self.max_len] if self.max_len is not None else x_length
+            embeds = self.embedding(x_truncated)
+            dropped_embeds = self.dropout(embeds)
+            dropped_embeds_packed = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, x_length_truncated.cpu().numpy(), batch_first=True)
+            gru_output_packed, _ = self.GRU(dropped_embeds_packed)
+            gru_output, _ = torch.nn.utils.rnn.pad_packed_sequence(gru_output_packed, batch_first=True)
+        else:
+            input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+            embeds = self.embedding(input_truncated)
+            dropped_embeds = self.dropout(embeds)
+            gru_output, _ = self.GRU(dropped_embeds)
         gru_final_output = gru_output[:, -1, :]
         gru_final_dropout = self.dropout_softmax(gru_final_output)
         out = self.linear(gru_final_dropout)
@@ -173,7 +181,7 @@ class GRUClassifier(BaseModelClass, ABC):
 
 class LSTMClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=200, hidden_size=100, bidirectional=False,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, hidden_size=100, bidirectional=False,
                  num_categories=2, name='LSTM'):
         super().__init__()
         self.bidirectional = bidirectional
@@ -190,10 +198,20 @@ class LSTMClassifier(BaseModelClass, ABC):
         self.finish_setup()
 
     def forward(self, inputs):
-        input_truncated = inputs[:, :self.max_len]
-        embeds = self.embedding(input_truncated)
-        dropped_embeds = self.dropout(embeds)
-        lstm_output, _ = self.LSTM(dropped_embeds)
+        if isinstance(inputs, tuple):
+            x, x_length = inputs
+            x_truncated = x[:, :self.max_len] if self.max_len is not None else x
+            x_length_truncated = x_length[:, :self.max_len] if self.max_len is not None else x_length
+            embeds = self.embedding(x_truncated)
+            dropped_embeds = self.dropout(embeds)
+            dropped_embeds_packed = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, x_length_truncated.cpu().numpy(), batch_first=True)
+            lstm_output_packed, _ = self.LSTM(dropped_embeds_packed)
+            lstm_output, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_output_packed, batch_first=True)
+        else:
+            input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+            embeds = self.embedding(input_truncated)
+            dropped_embeds = self.dropout(embeds)
+            lstm_output, _ = self.LSTM(dropped_embeds)
         lstm_final_output = lstm_output[:, -1, :]
         lstm_final_dropout = self.dropout_softmax(lstm_final_output)
         out = self.linear(lstm_final_dropout)

@@ -25,11 +25,7 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
         model.latest_scheduled_lr = optimiser.param_groups[0]['lr']
         loss = 0.
         for xb, yb in train_data:
-            if data_hyperparameters.USE_CUDA:
-                yb = yb.cuda()
-                xb = (x.cuda() for x in xb) if isinstance(xb, tuple) else xb.cuda()
-            outputs = model(xb)
-            batch_loss = loss_function(outputs, yb)
+            batch_loss = loss_function(model(xb), yb)
             loss += batch_loss.item() / len(train_data)
             optimiser.zero_grad()
             batch_loss.backward()
@@ -40,15 +36,10 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
             if epoch + 1 % report_accuracy_every == 0:
                 accuracy = get_accuracy(train_data, model)
                 write_log('Training accuracy: {0}'.format(accuracy), logger)
+                model.train_accuracies[epoch + 1] = accuracy
         model.eval()
         with torch.no_grad():
-            loss = 0.
-            for xb, yb in valid_data:
-                if data_hyperparameters.USE_CUDA:
-                    yb = yb.cuda()
-                    xb = (x.cuda() for x in xb) if isinstance(xb, tuple) else xb.cuda()
-                outputs = model(xb)
-                loss += loss_function(outputs, yb).item() / len(valid_data)
+            loss = sum([loss_function(model(xb), yb).item() for xb, yb in valid_data]) / len(valid_data)
         model.valid_losses.append(loss)
         scheduler.step(loss)
         write_log('Validation loss: {0}'.format(loss), logger)
@@ -56,6 +47,7 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
             if epoch + 1 % report_accuracy_every == 0:
                 accuracy = get_accuracy(valid_data, model)
                 write_log('Validation accuracy: {0}'.format(accuracy), logger)
+                model.valid_accuracies[epoch + 1] = accuracy
         model.num_epochs_trained += 1
         write_log('Epoch took {0} seconds'.format((datetime.now() - now_begin_epoch).total_seconds()), logger)
     model.train_time += (datetime.now() - now_begin_training).total_seconds()
