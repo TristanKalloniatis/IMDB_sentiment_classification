@@ -65,6 +65,19 @@ class BaseModelClass(torch.nn.Module, ABC):
         ax.legend()
         plt.savefig('learning_curve_{0}.png'.format(self.name))
 
+        if len(self.train_accuracies) != 0:
+            fig, ax = plt.subplots()
+            epochs = list(self.train_accuracies.keys())
+            train_accuracies = list(self.train_accuracies.values())
+            valid_accuracies = list(self.valid_accuracies.values())
+            ax.scatter(epochs, train_accuracies, label='Training')
+            ax.plot(epochs, valid_accuracies, label='Validation')
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Accuracy')
+            ax.set_title('Accuracies for {0}'.format(self.name))
+            ax.legend()
+            plt.savefig('accuracies_{0}.png'.format(self.name))
+
 
 class AverageEmbeddingModel(BaseModelClass, ABC):
     def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,

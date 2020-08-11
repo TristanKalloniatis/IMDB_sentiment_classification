@@ -33,19 +33,19 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
             optimiser.step()
         model.train_losses.append(loss)
         write_log('Training loss: {0}'.format(loss), logger)
+        model.eval()
         if report_accuracy_every is not None:
-            if epoch + 1 % report_accuracy_every == 0:
+            if (epoch + 1) % report_accuracy_every == 0:
                 accuracy = get_accuracy(train_data, model)
                 write_log('Training accuracy: {0}'.format(accuracy), logger)
                 model.train_accuracies[epoch + 1] = accuracy
-        model.eval()
         with torch.no_grad():
             loss = sum([loss_function(model(xb), yb).item() for xb, yb in valid_data]) / len(valid_data)
         model.valid_losses.append(loss)
         scheduler.step(loss)
         write_log('Validation loss: {0}'.format(loss), logger)
         if report_accuracy_every is not None:
-            if epoch + 1 % report_accuracy_every == 0:
+            if (epoch + 1) % report_accuracy_every == 0:
                 accuracy = get_accuracy(valid_data, model)
                 write_log('Validation accuracy: {0}'.format(accuracy), logger)
                 model.valid_accuracies[epoch + 1] = accuracy
