@@ -71,7 +71,7 @@ class BaseModelClass(torch.nn.Module, ABC):
             train_accuracies = list(self.train_accuracies.values())
             valid_accuracies = list(self.valid_accuracies.values())
             ax.scatter(epochs, train_accuracies, label='Training')
-            ax.plot(epochs, valid_accuracies, label='Validation')
+            ax.scatter(epochs, valid_accuracies, label='Validation')
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Accuracy')
             ax.set_title('Accuracies for {0}'.format(self.name))
