@@ -5,6 +5,7 @@ import os
 import csv
 from log_utils import create_logger, write_log
 from model_classes import get_accuracy
+from pickle import dump, load
 
 LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
@@ -66,3 +67,36 @@ def report_statistics(model, train_data, valid_data, test_data):
         with open(data_hyperparameters.STATISTICS_FILE, 'a') as f:
             w = csv.DictWriter(f, model_data.keys())
             w.writerow(model_data)
+
+def save_model(model):
+    torch.save(model.state_dict(), model.name + '.pt')
+    model_data = {'train_losses': model.train_losses, 'valid_losses': model.valid_losses,
+                  'num_epochs_trained': model.num_epochs_trained, 'latest_scheduled_lr': model.latest_scheduled_lr,
+                  'train_time': model.train_time, 'num_trainable_params': model.num_trainable_params,
+                  'instantiated': model.instantiated, 'name': model.name, 'vocab_size': model.vocab_size,
+                  'tokenizer': model.tokenizer, 'batch_size': model.batch_size,
+                  'train_accuracies': model.train_accuracies, 'valid_accuracies': model.valid_accuracies}
+    outfile = open(model.name + '_model_data', 'wb')
+    dump(model_data, outfile)
+    outfile.close()
+
+def load_model_state(model, model_name):
+    model.load_state_dict(torch.load(model_name + '.pt'))
+    write_log('Loaded model {0} weights'.format(model_name), logger)
+    infile = open(model_name + '_model_data', 'rb')
+    model_data = load(infile)
+    infile.close()
+    model.train_losses = model_data['train_losses']
+    model.valid_losses = model_data['valid_losses']
+    model.num_epochs_trained = model_data['num_epochs_trained']
+    model.latest_scheduled_lr = model_data['latest_scheduled_lr']
+    model.train_time = model_data['train_time']
+    model.num_trainable_params = model_data['num_trainable_params']
+    model.instantiated = model_data['instantiated']
+    model.name = model_data['name']
+    model.vocab_size = model_data['vocab_size']
+    model.tokenizer = model_data['tokenizer']
+    model.batch_size = model_data['batch_size']
+    model.train_accuracies = model_data['train_accuracies']
+    model.valid_accuracies = model_data['valid_accuracies']
+    write_log('Loaded model {0} state'.format(model_name), logger)
