@@ -128,7 +128,9 @@ class ConvNGram(BaseModelClass, ABC):
 
 
 class ConvMultiGram(BaseModelClass, ABC):
-    def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25, vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_features=100, num_categories=2, name='ConvMultiGram'):
+    def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_features=100, num_categories=2,
+                 name='ConvMultiGram'):
         super().__init__()
         self.name = name
         self.embedding_dimension = embedding_dimension
@@ -137,7 +139,7 @@ class ConvMultiGram(BaseModelClass, ABC):
         self.conv2 = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=num_features, kernel_size=2)
         self.conv3 = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=num_features, kernel_size=3)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
-        self.linear = torch.nn.Linear(embedding_dimension + 2*num_features, num_categories)
+        self.linear = torch.nn.Linear(embedding_dimension + 2 * num_features, num_categories)
         self.finish_setup()
 
     def forward(self, inputs):
@@ -179,7 +181,9 @@ class GRUClassifier(BaseModelClass, ABC):
             x_length_truncated = x_length[:, :self.max_len] if self.max_len is not None else x_length
             embeds = self.embedding(x_truncated)
             dropped_embeds = self.dropout(embeds)
-            dropped_embeds_packed = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, x_length_truncated.cpu().numpy(), batch_first=True)
+            dropped_embeds_packed = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds,
+                                                                            x_length_truncated.cpu().numpy(),
+                                                                            batch_first=True)
             gru_output_packed, _ = self.GRU(dropped_embeds_packed)
             gru_output, _ = torch.nn.utils.rnn.pad_packed_sequence(gru_output_packed, batch_first=True)
         else:
@@ -191,6 +195,7 @@ class GRUClassifier(BaseModelClass, ABC):
         gru_final_dropout = self.dropout_softmax(gru_final_output)
         out = self.linear(gru_final_dropout)
         return torch.nn.functional.log_softmax(out, dim=-1)
+
 
 class LSTMClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
@@ -217,7 +222,9 @@ class LSTMClassifier(BaseModelClass, ABC):
             x_length_truncated = x_length[:, :self.max_len] if self.max_len is not None else x_length
             embeds = self.embedding(x_truncated)
             dropped_embeds = self.dropout(embeds)
-            dropped_embeds_packed = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, x_length_truncated.cpu().numpy(), batch_first=True)
+            dropped_embeds_packed = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds,
+                                                                            x_length_truncated.cpu().numpy(),
+                                                                            batch_first=True)
             lstm_output_packed, _ = self.LSTM(dropped_embeds_packed)
             lstm_output, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_output_packed, batch_first=True)
         else:
@@ -229,6 +236,7 @@ class LSTMClassifier(BaseModelClass, ABC):
         lstm_final_dropout = self.dropout_softmax(lstm_final_output)
         out = self.linear(lstm_final_dropout)
         return torch.nn.functional.log_softmax(out, dim=-1)
+
 
 class PositionalEncoding(torch.nn.Module):
     # Modified from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
@@ -251,7 +259,8 @@ class PositionalEncoding(torch.nn.Module):
 
 
 class TransformerEncoderLayer(BaseModelClass, ABC):
-    def __init__(self, max_len, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4, dim_feedforward=1024,
+    def __init__(self, max_len, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
+                 dim_feedforward=1024,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='last', num_categories=2,
                  name='TransformerEncoderLayer'):
         super().__init__()
@@ -272,12 +281,14 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
         embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
         transforms = self.encoder_layer(positional_encodings)
-        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0] # todo: try mean?
+        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0]  # todo: try mean?
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)
 
+
 class TransformerEncoder(BaseModelClass, ABC):
-    def __init__(self, num_layers, max_len=200, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4, dim_feedforward=1024,
+    def __init__(self, num_layers, max_len=200, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
+                 dim_feedforward=1024,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='last', num_categories=2,
                  name='TransformerEncoder'):
         super().__init__()
@@ -299,6 +310,6 @@ class TransformerEncoder(BaseModelClass, ABC):
         embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
         transforms = self.encoder(positional_encodings)
-        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0] # todo: try mean?
+        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0]  # todo: try mean?
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)

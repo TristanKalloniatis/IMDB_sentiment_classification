@@ -11,11 +11,13 @@ LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
 
 
-def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, patience=data_hyperparameters.PATIENCE, report_accuracy_every=None):
+def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, patience=data_hyperparameters.PATIENCE,
+          report_accuracy_every=None):
     loss_function = torch.nn.NLLLoss()
     if data_hyperparameters.USE_CUDA:
         model.cuda()
-    optimiser = torch.optim.Adam(model.parameters()) if model.latest_scheduled_lr is None else torch.optim.Adam(model.parameters(), lr=model.latest_scheduled_lr)
+    optimiser = torch.optim.Adam(model.parameters()) if model.latest_scheduled_lr is None else torch.optim.Adam(
+        model.parameters(), lr=model.latest_scheduled_lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=patience)
     now_begin_training = datetime.now()
     start_epoch = model.num_epochs_trained
@@ -68,6 +70,7 @@ def report_statistics(model, train_data, valid_data, test_data):
             w = csv.DictWriter(f, model_data.keys())
             w.writerow(model_data)
 
+
 def save_model(model):
     torch.save(model.state_dict(), model.name + '.pt')
     model_data = {'train_losses': model.train_losses, 'valid_losses': model.valid_losses,
@@ -79,6 +82,7 @@ def save_model(model):
     outfile = open(model.name + '_model_data', 'wb')
     dump(model_data, outfile)
     outfile.close()
+
 
 def load_model_state(model, model_name):
     model.load_state_dict(torch.load(model_name + '.pt'))
