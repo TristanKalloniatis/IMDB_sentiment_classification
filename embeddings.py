@@ -6,11 +6,12 @@ import glob
 import data_hyperparameters
 from datetime import datetime
 from log_utils import create_logger, write_log
-from data_downloader import get_vocab, save_data, split_data
+from data_downloader import get_vocab, save_data
 from math import sqrt
 from random import random
 from torch.utils import data  # todo: remove this
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 
 TOKENIZER = data_hyperparameters.TOKENIZER
 VOCAB_SIZE = data_hyperparameters.VOCAB_SIZE
@@ -33,7 +34,7 @@ def get_data():
         freqs = list(map(lambda i: vocab.freqs[vocab_index[i]], range(len(vocab))))
         total = sum(freqs)
         for i in range(len(freqs)):
-            freqs /= total
+            freqs[i] /= total
         save_data(freqs, FREQS_FILE)
         unsup_data = glob.iglob('.data/aclImdb/train/unsup/*')
         all_mapped_tokens = []
@@ -41,7 +42,8 @@ def get_data():
         now = datetime.now()
         for data in unsup_data:
             with open(data, 'r') as f:
-                write_log('Processing {0}'.format(f), logger)
+                if data_hyperparameters.VERBOSE_LOGGING:
+                    write_log('Processing {0}'.format(f), logger)
                 text = f.read()
                 mapped_tokens = [vocab_reverse_index[token] for token in tokenizer(text)]
             all_mapped_tokens.append(mapped_tokens)
@@ -79,7 +81,7 @@ def noise_distribution(frequencies, unigram_distribution_power=data_hyperparamet
 
 
 def produce_negative_samples(distribution, num_negative_samples=data_hyperparameters.NUM_NEGATIVE_SAMPLES,
-                             batch_size=data_hyperparameters.BATCH_SIZE):
+                             batch_size=data_hyperparameters.WORD_EMBEDDING_BATCH_SIZE):
     return torch.multinomial(distribution, batch_size * num_negative_samples, replacement=True).view(batch_size, -1)
 
 
@@ -103,7 +105,7 @@ def pre_process_words(words, algorithm, context_size=data_hyperparameters.CONTEX
 def build_data_loader(raw_data, frequencies, algorithm, context_size=data_hyperparameters.CONTEXT_SIZE,
                       threshold=data_hyperparameters.SUBSAMPLE_THRESHOLD,
                       min_review_length=data_hyperparameters.MIN_REVIEW_LENGTH, sub_sample=False,
-                      batch_size=None, shuffle=False):
+                      batch_size=data_hyperparameters.WORD_EMBEDDING_BATCH_SIZE, shuffle=False):
     xs = []
     ys = []
     for review in raw_data:
@@ -118,15 +120,18 @@ def build_data_loader(raw_data, frequencies, algorithm, context_size=data_hyperp
     xs = torch.tensor(xs, device=device)
     ys = torch.tensor(ys, device=device)
     ds = torch.utils.data.TensorDataset(xs, ys)
-    if batch_size is not None:
-        dl = torch.utils.data.DataLoader(ds, batch_size=batch_size, shuffle=shuffle)
-    else:
-        dl = torch.utils.data.DataLoader(ds, shuffle=shuffle)
+    dl = torch.utils.data.DataLoader(ds, batch_size=batch_size, shuffle=shuffle)
     return dl
 
 
-def setup(algorithm, batch_size=data_hyperparameters.BATCH_SIZE, context_size=data_hyperparameters.CONTEXT_SIZE,
-          threshold=data_hyperparameters.SUBSAMPLE_THRESHOLD,
+def split_data(raw_data, train_proportion=data_hyperparameters.TRAIN_PROPORTION):
+    train_data = raw_data[: int(len(raw_data) * train_proportion)]
+    valid_data = raw_data[int(len(raw_data) * train_proportion):]
+    return train_data, valid_data
+
+
+def setup(algorithm, batch_size=data_hyperparameters.WORD_EMBEDDING_BATCH_SIZE,
+          context_size=data_hyperparameters.CONTEXT_SIZE, threshold=data_hyperparameters.SUBSAMPLE_THRESHOLD,
           unigram_distribution_power=data_hyperparameters.UNIGRAM_DISTRIBUTION_POWER,
           min_review_length=data_hyperparameters.MIN_REVIEW_LENGTH):
     now = datetime.now()
@@ -137,7 +142,7 @@ def setup(algorithm, batch_size=data_hyperparameters.BATCH_SIZE, context_size=da
     train_loader = build_data_loader(train_data, frequencies, algorithm, context_size, threshold, min_review_length,
                                      sub_sample=True, batch_size=batch_size, shuffle=True)
     write_log('Validation data', logger)
-    valid_loader = build_data_loader(valid_data, frequencies, context_size, algorithm, threshold, min_review_length,
+    valid_loader = build_data_loader(valid_data, frequencies, algorithm, context_size, threshold, min_review_length,
                                      sub_sample=True, batch_size=2 * batch_size, shuffle=False)
     seconds = (datetime.now() - now).total_seconds()
     write_log('Setting up took: {0} seconds'.format(seconds), logger)
@@ -199,8 +204,9 @@ class SkipGramWithNegativeSampling(torch.nn.Module):
 
 
 def train(model_name, train_loader, valid_loader, vocab_size=data_hyperparameters.VOCAB_SIZE, distribution=None,
-          epochs=data_hyperparameters.EPOCHS, embedding_dim=data_hyperparameters.WORD_EMBEDDING_DIMENSION,
-          context_size=data_hyperparameters.CONTEXT_SIZE, inner_product_clamp=data_hyperparameters.INNER_PRODUCT_CLAMP,
+          epochs=data_hyperparameters.WORD_EMBEDDING_EPOCHS,
+          embedding_dim=data_hyperparameters.WORD_EMBEDDING_DIMENSION, context_size=data_hyperparameters.CONTEXT_SIZE,
+          inner_product_clamp=data_hyperparameters.INNER_PRODUCT_CLAMP,
           num_negative_samples=data_hyperparameters.NUM_NEGATIVE_SAMPLES, algorithm='SGNS'):
     train_losses = []
     valid_losses = []
@@ -215,15 +221,13 @@ def train(model_name, train_loader, valid_loader, vocab_size=data_hyperparameter
         model.cuda()
         if algorithm.upper() == 'SGNS':
             distribution_tensor = distribution_tensor.to('cuda')
-    optimizer = torch.optim.Adam(model.parameters())
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', verbose=True)
-
+    optimizer = torch.optim.Adam(model.parameters(), lr=1.)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=1, verbose=True)
+    write_log('Training on {0} batches and validating on {1} batches'.format(len(train_loader), len(valid_loader)),
+              logger)
     for epoch in range(epochs):
         now = datetime.now()
         write_log('Epoch: {0}'.format(epoch), logger)
-        write_log('Training on {0} batches and validating on {1} batches'.format(len(train_loader), len(valid_loader)),
-                  logger)
-
         model.train()
         total_loss = 0
         for xb, yb in train_loader:

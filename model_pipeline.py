@@ -59,6 +59,7 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
 
 
 def report_statistics(model, train_data, valid_data, test_data):
+    save_model(model)
     model_data = model.get_model_performance_data(train_data, valid_data, test_data)
     if not os.path.isfile(data_hyperparameters.STATISTICS_FILE):
         with open(data_hyperparameters.STATISTICS_FILE, 'w') as f:

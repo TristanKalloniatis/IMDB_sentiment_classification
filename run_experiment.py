@@ -16,4 +16,3 @@ for model in models:
     model_pipeline.train(model=model, train_data=train_data, valid_data=valid_data)
     model.plot_losses()
     model_pipeline.report_statistics(model=model, train_data=train_data, valid_data=valid_data, test_data=test_data)
-    model_pipeline.save_model(model)
