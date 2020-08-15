@@ -7,6 +7,7 @@ from datetime import datetime
 from log_utils import create_logger, write_log
 from sklearn.model_selection import train_test_split
 import glob
+from torch.utils import data # todo: remove this
 
 VOCAB_SIZE = data_hyperparameters.VOCAB_SIZE
 TOKENIZER = data_hyperparameters.TOKENIZER
@@ -53,7 +54,8 @@ def get_data():
     vocab = get_vocab()
     vocab_reverse_index = vocab.stoi
     PAD_TOKEN = vocab.stoi['<pad>']
-    if not os.path.exists(FIT_FILE):
+    if not os.path.exists(FIT_FILE) or not os.path.exists(FIT_LABELS_FILE) or not os.path.exists(TEST_FILE) \
+            or not os.path.exists(TEST_LABELS_FILE):
         write_log('Building fit and test data (this may take a while)', logger)
         now = datetime.now()
         fit_mapped_tokens = []

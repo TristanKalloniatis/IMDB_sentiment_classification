@@ -11,7 +11,6 @@ from math import sqrt
 from random import random
 from torch.utils import data  # todo: remove this
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
 
 TOKENIZER = data_hyperparameters.TOKENIZER
 VOCAB_SIZE = data_hyperparameters.VOCAB_SIZE
@@ -82,7 +81,7 @@ def noise_distribution(frequencies, unigram_distribution_power=data_hyperparamet
 
 def produce_negative_samples(distribution, num_negative_samples=data_hyperparameters.NUM_NEGATIVE_SAMPLES,
                              batch_size=data_hyperparameters.WORD_EMBEDDING_BATCH_SIZE):
-    return torch.multinomial(distribution, batch_size * num_negative_samples, replacement=True).view(batch_size, -1)
+    return torch.multinomial(distribution, batch_size * num_negative_samples, replacement=True).view(batch_size, -1).to(device)
 
 
 def pre_process_words(words, algorithm, context_size=data_hyperparameters.CONTEXT_SIZE,
@@ -203,24 +202,31 @@ class SkipGramWithNegativeSampling(torch.nn.Module):
         return positive_score_log_sigmoid + negative_scores_log_sigmoid
 
 
-def train(model_name, train_loader, valid_loader, vocab_size=data_hyperparameters.VOCAB_SIZE, distribution=None,
-          epochs=data_hyperparameters.WORD_EMBEDDING_EPOCHS,
-          embedding_dim=data_hyperparameters.WORD_EMBEDDING_DIMENSION, context_size=data_hyperparameters.CONTEXT_SIZE,
-          inner_product_clamp=data_hyperparameters.INNER_PRODUCT_CLAMP,
-          num_negative_samples=data_hyperparameters.NUM_NEGATIVE_SAMPLES, algorithm='SGNS'):
+class Elmo(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, inputs):
+        pass
+
+
+def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparameters.VOCAB_SIZE, distribution=None,
+              epochs=data_hyperparameters.WORD_EMBEDDING_EPOCHS,
+              embedding_dim=data_hyperparameters.WORD_EMBEDDING_DIMENSION,
+              context_size=data_hyperparameters.CONTEXT_SIZE,
+              inner_product_clamp=data_hyperparameters.INNER_PRODUCT_CLAMP,
+              num_negative_samples=data_hyperparameters.NUM_NEGATIVE_SAMPLES, algorithm='SGNS'):
     train_losses = []
     valid_losses = []
     if algorithm.upper() == 'CBOW':
         model = ContinuousBagOfWords(vocab_size, embedding_dim, context_size, model_name)
         loss_function = torch.nn.NLLLoss()
-    elif algorithm.upper() == 'SGNS':
+    else:
         model = SkipGramWithNegativeSampling(vocab_size, embedding_dim, context_size, num_negative_samples,
                                              inner_product_clamp, model_name)
-        distribution_tensor = torch.tensor(distribution, dtype=torch.float)
+        distribution_tensor = torch.tensor(distribution, dtype=torch.float, device=device)
     if data_hyperparameters.USE_CUDA:
         model.cuda()
-        if algorithm.upper() == 'SGNS':
-            distribution_tensor = distribution_tensor.to('cuda')
     optimizer = torch.optim.Adam(model.parameters(), lr=1.)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=1, verbose=True)
     write_log('Training on {0} batches and validating on {1} batches'.format(len(train_loader), len(valid_loader)),
@@ -237,10 +243,8 @@ def train(model_name, train_loader, valid_loader, vocab_size=data_hyperparameter
             if algorithm.upper() == 'CBOW':
                 predictions = model(xb)
                 loss = loss_function(predictions, yb)
-            elif algorithm.upper() == 'SGNS':
+            else:
                 negative_samples = produce_negative_samples(distribution_tensor, num_negative_samples, len(yb))
-                if data_hyperparameters.USE_CUDA:
-                    negative_samples = negative_samples.to('cuda')
                 loss = torch.mean(model(yb, xb, negative_samples))
             loss.backward()
             total_loss += loss.item()
@@ -261,8 +265,6 @@ def train(model_name, train_loader, valid_loader, vocab_size=data_hyperparameter
                     valid_loss += loss_function(model(xb), yb).item()
                 elif algorithm.upper() == 'SGNS':
                     negative_samples = produce_negative_samples(distribution_tensor, num_negative_samples, len(yb))
-                    if data_hyperparameters.USE_CUDA:
-                        negative_samples = negative_samples.to('cuda')
                     loss = model(yb, xb, negative_samples)
                     valid_loss += torch.mean(loss).item()
         valid_loss = valid_loss / len(valid_loader)
@@ -285,11 +287,11 @@ def train(model_name, train_loader, valid_loader, vocab_size=data_hyperparameter
     return model
 
 
-def save_model_state(model):
+def save_model_state_w2v(model):
     torch.save(model.state_dict(), model.name + '_' + model.algorithmType + '.pt')
     if model.algorithm_type == 'CBOW':
         model_data = {'embedding_dim': model.embedding_dim, 'context_size': model.context_size}
-    elif model.algorithm_type == 'SGNS':
+    else:
         model_data = {'embedding_dim': model.embedding_dim, 'context_size': model.context_size,
                      'num_negative_samples': model.num_negative_samples,
                       'inner_product_clamp': model.inner_product_clamp}
@@ -300,7 +302,8 @@ def save_model_state(model):
     return
 
 
-def loadModelState(model_name, algorithm_type, unigram_distribution_power=data_hyperparameters.UNIGRAM_DISTRIBUTION_POWER):
+def loadModelState_w2v(model_name, algorithm_type,
+                       unigram_distribution_power=data_hyperparameters.UNIGRAM_DISTRIBUTION_POWER):
     frequencies = pickle.load(open(FREQS_FILE, "rb"))
     distribution = noise_distribution(frequencies, unigram_distribution_power)
     infile = open(model_name + '_' + algorithm_type + '_model_data', 'rb')
@@ -309,7 +312,7 @@ def loadModelState(model_name, algorithm_type, unigram_distribution_power=data_h
     if algorithm_type.upper() == 'CBOW':
         model = ContinuousBagOfWords(data_hyperparameters.VOCAB_SIZE, model_data['embeddingDim'],
                                      model_data['contextSize'], model_name)
-    elif algorithm_type.upper() == 'SGNS':
+    else:
         model = SkipGramWithNegativeSampling(data_hyperparameters.VOCAB_SIZE, model_data['embeddingDim'],
                                              model_data['contextSize'], model_data['numNegativeSamples'],
                                              model_data['innerProductClamp'], model_name)
@@ -319,3 +322,9 @@ def loadModelState(model_name, algorithm_type, unigram_distribution_power=data_h
     write_log('Loaded model {0}'.format(model_name), logger)
     model.eval()
     return frequencies, distribution, model
+
+
+def train_elmo(model_name, train_loader, valid_loader, vocab_size=data_hyperparameters.VOCAB_SIZE,
+               epochs=data_hyperparameters.WORD_EMBEDDING_EPOCHS,
+               embedding_dim=data_hyperparameters.WORD_EMBEDDING_DIMENSION):
+    pass
