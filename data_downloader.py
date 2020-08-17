@@ -145,26 +145,11 @@ def get_dataloaders(batch_size=data_hyperparameters.BATCH_SIZE, pack=False):
             [torch.cat((x, torch.tensor([PAD_TOKEN] * (max_len - len(x)), device=device).long())) for x in xs])
         return xs_padded, ys
 
-    def pad_batch_get_length(batch):
-        max_len = max([sample[0] for sample in batch])
-        ys = torch.tensor([sample[2] for sample in batch], dtype=torch.long, device=device)
-        xs = [sample[3] for sample in batch]
-        xs_padded = torch.stack(
-            [torch.cat((x, torch.tensor([PAD_TOKEN] * (max_len - len(x)), device=device).long())) for x in xs])
-        x_lengths = torch.tensor([len(x) for x in xs], dtype=torch.long, device=device)
-        # Sort by length
-        index = torch.argsort(x_lengths, descending=True)
-        xs_padded = xs_padded[index]
-        ys = ys[index]
-        x_lengths = x_lengths[index]
-        return (xs_padded, x_lengths), ys
-
     dataset_train_y, dataset_train_x, dataset_valid_y, dataset_valid_x = split_data(fit_mapped_tokens, fit_labels)
 
-    collate_fn = pad_batch_get_length if pack else pad_batch
     return torch.utils.data.DataLoader(dataset=augment_dataset(dataset_train_x, dataset_train_y), batch_size=batch_size,
-                                       collate_fn=collate_fn), \
+                                       collate_fn=pad_batch), \
            torch.utils.data.DataLoader(dataset=augment_dataset(dataset_valid_x, dataset_valid_y), batch_size=batch_size,
-                                       collate_fn=collate_fn), \
+                                       collate_fn=pad_batch), \
            torch.utils.data.DataLoader(dataset=augment_dataset(test_mapped_tokens, test_labels), batch_size=batch_size,
-                                       collate_fn=collate_fn)
+                                       collate_fn=pad_batch)
