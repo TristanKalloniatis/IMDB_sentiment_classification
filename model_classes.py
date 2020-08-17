@@ -159,12 +159,16 @@ class ConvMultiGram(BaseModelClass, ABC):
 class GRUClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, hidden_size=100, bidirectional=False,
-                 num_categories=2, name='GRU'):
+                 num_categories=2, use_packing=False, name='GRU'):
         super().__init__()
         self.bidirectional = bidirectional
         self.max_len = max_len
         self.embedding_dimension = embedding_dimension
-        self.hidden_size_scaled = hidden_size * 2 if bidirectional else hidden_size
+        self.hidden_size = hidden_size
+        self.num_directions = 2 if bidirectional else 1
+        self.hidden_size_scaled = hidden_size * self.num_directions
+        self.use_packing = use_packing
+        self.num_layers = num_layers
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.dropout = torch.nn.Dropout(p=dropout)
         self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
@@ -175,23 +179,17 @@ class GRUClassifier(BaseModelClass, ABC):
         self.finish_setup()
 
     def forward(self, inputs):
-        if isinstance(inputs, tuple):
-            x, x_length = inputs
-            x_truncated = x[:, :self.max_len] if self.max_len is not None else x
-            x_length_truncated = x_length[:, :self.max_len] if self.max_len is not None else x_length
-            embeds = self.embedding(x_truncated)
-            dropped_embeds = self.dropout(embeds)
-            dropped_embeds_packed = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds,
-                                                                            x_length_truncated.cpu().numpy(),
-                                                                            batch_first=True)
-            gru_output_packed, _ = self.GRU(dropped_embeds_packed)
-            gru_output, _ = torch.nn.utils.rnn.pad_packed_sequence(gru_output_packed, batch_first=True)
-        else:
-            input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
-            embeds = self.embedding(input_truncated)
-            dropped_embeds = self.dropout(embeds)
-            gru_output, _ = self.GRU(dropped_embeds)
-        gru_final_output = gru_output[:, -1, :]
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.dropout(embeds)
+        if self.use_packing:
+            input_length = torch.sum(input_truncated != 1, dim=-1)
+            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, batch_first=True,
+                                                                     enforce_sorted=False)
+        _, gru_hn = self.GRU(dropped_embeds)
+        gru_final_output = torch.flatten(
+            gru_hn.view(self.num_layers, self.num_directions, -1, self.hidden_size)[-1, :, :, :].transpose(0, 1),
+            start_dim=1)
         gru_final_dropout = self.dropout_softmax(gru_final_output)
         out = self.linear(gru_final_dropout)
         return torch.nn.functional.log_softmax(out, dim=-1)
@@ -200,12 +198,16 @@ class GRUClassifier(BaseModelClass, ABC):
 class LSTMClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, hidden_size=100, bidirectional=False,
-                 num_categories=2, name='LSTM'):
+                 num_categories=2, use_packing=False, name='LSTM'):
         super().__init__()
         self.bidirectional = bidirectional
         self.max_len = max_len
         self.embedding_dimension = embedding_dimension
-        self.hidden_size_scaled = hidden_size * 2 if bidirectional else hidden_size
+        self.hidden_size = hidden_size
+        self.num_directions = 2 if bidirectional else 1
+        self.hidden_size_scaled = hidden_size * self.num_directions
+        self.use_packing = use_packing
+        self.num_layers = num_layers
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.dropout = torch.nn.Dropout(p=dropout)
         self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
@@ -216,23 +218,17 @@ class LSTMClassifier(BaseModelClass, ABC):
         self.finish_setup()
 
     def forward(self, inputs):
-        if isinstance(inputs, tuple):
-            x, x_length = inputs
-            x_truncated = x[:, :self.max_len] if self.max_len is not None else x
-            x_length_truncated = x_length[:, :self.max_len] if self.max_len is not None else x_length
-            embeds = self.embedding(x_truncated)
-            dropped_embeds = self.dropout(embeds)
-            dropped_embeds_packed = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds,
-                                                                            x_length_truncated.cpu().numpy(),
-                                                                            batch_first=True)
-            lstm_output_packed, _ = self.LSTM(dropped_embeds_packed)
-            lstm_output, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_output_packed, batch_first=True)
-        else:
-            input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
-            embeds = self.embedding(input_truncated)
-            dropped_embeds = self.dropout(embeds)
-            lstm_output, _ = self.LSTM(dropped_embeds)
-        lstm_final_output = lstm_output[:, -1, :]
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.dropout(embeds)
+        if self.use_packing:
+            input_length = torch.sum(input_truncated != 1, dim=-1)
+            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, batch_first=True,
+                                                                     enforce_sorted=False)
+        _, (lstm_hn, _) = self.LSTM(dropped_embeds)
+        lstm_final_output = torch.flatten(
+            lstm_hn.view(self.num_layers, self.num_directions, -1, self.hidden_size)[-1, :, :, :].transpose(0, 1),
+            start_dim=1)
         lstm_final_dropout = self.dropout_softmax(lstm_final_output)
         out = self.linear(lstm_final_dropout)
         return torch.nn.functional.log_softmax(out, dim=-1)
