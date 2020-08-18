@@ -133,7 +133,7 @@ def augment_dataset(dataset_x, dataset_y):
     return samples
 
 
-def get_dataloaders(batch_size=data_hyperparameters.BATCH_SIZE, pack=False):
+def get_dataloaders(batch_size=data_hyperparameters.BATCH_SIZE):
     PAD_TOKEN, fit_mapped_tokens, fit_labels, test_mapped_tokens, test_labels = get_data()
 
     def pad_batch(batch):
