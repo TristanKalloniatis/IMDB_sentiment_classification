@@ -203,11 +203,29 @@ class SkipGramWithNegativeSampling(torch.nn.Module):
 
 
 class Elmo(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, num_layers=2, embedding_dim=data_hyperparameters.WORD_EMBEDDING_DIMENSION, hidden_size=20, vocab_size=data_hyperparameters.VOCAB_SIZE + 2, dropout=0.4, use_packing=True, max_len=None):
         super().__init__()
+        self.hidden_size = hidden_size
+        self.embeddings = torch.nn.Embedding(vocab_size, embedding_dim)
+        self.LSTM = torch.nn.LSTM(input_size=embedding_dim, dropout=dropout, hidden_size=hidden_size, bidirectional=True, batch_first=True, num_layers=num_layers)
+        self.linear = torch.nn.Linear(hidden_size, vocab_size)
+        self.use_packing = use_packing
+        self.max_len = max_len
 
     def forward(self, inputs):
-        pass
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        embeds = self.embedding(input_truncated)
+        if self.use_packing:
+            input_length = torch.sum(input_truncated != 1, dim=-1)
+            embeds = torch.nn.utils.rnn.pack_padded_sequence(embeds, input_length, batch_first=True,
+                                                                     enforce_sorted=False)
+        _, (lstm_hn, _) = self.LSTM(embeds)
+        lstm_final_output = torch.flatten(
+            lstm_hn.view(self.num_layers, 2, -1, self.hidden_size)[-1, :, :, :].transpose(0, 1),
+            start_dim=1)
+        out = self.linear(lstm_final_output)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
 
 
 def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparameters.VOCAB_SIZE, distribution=None,
@@ -237,9 +255,6 @@ def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparam
         model.train()
         total_loss = 0
         for xb, yb in train_loader:
-            if data_hyperparameters.USE_CUDA:
-                xb = xb.to('cuda')
-                yb = yb.to('cuda')
             if algorithm.upper() == 'CBOW':
                 predictions = model(xb)
                 loss = loss_function(predictions, yb)
@@ -258,9 +273,6 @@ def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparam
         with torch.no_grad():
             valid_loss = 0
             for xb, yb in valid_loader:
-                if data_hyperparameters.USE_CUDA:
-                    xb = xb.to('cuda')
-                    yb = yb.to('cuda')
                 if algorithm.upper() == 'CBOW':
                     valid_loss += loss_function(model(xb), yb).item()
                 elif algorithm.upper() == 'SGNS':
@@ -282,7 +294,7 @@ def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparam
     ax.set_ylabel('Loss')
     ax.set_title('Learning curve for model {0}'.format(model_name))
     ax.legend()
-    plt.savefig('{0}learningCurve{1}{2}{3}.png'.format(model_name, embedding_dim, algorithm, context_size))
+    plt.savefig('{0}_learning_curve_{1}_{2}_{3}.png'.format(model_name, embedding_dim, algorithm, context_size))
 
     return model
 
