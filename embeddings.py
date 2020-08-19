@@ -206,9 +206,10 @@ class Elmo(torch.nn.Module):
     def __init__(self, num_layers=2, embedding_dim=data_hyperparameters.WORD_EMBEDDING_DIMENSION, hidden_size=20, vocab_size=data_hyperparameters.VOCAB_SIZE + 2, dropout=0.4, use_packing=True, max_len=None):
         super().__init__()
         self.hidden_size = hidden_size
-        self.embeddings = torch.nn.Embedding(vocab_size, embedding_dim)
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
         self.LSTM = torch.nn.LSTM(input_size=embedding_dim, dropout=dropout, hidden_size=hidden_size, bidirectional=True, batch_first=True, num_layers=num_layers)
-        self.linear = torch.nn.Linear(hidden_size, vocab_size)
+        self.linear = torch.nn.Linear(2 * hidden_size, vocab_size)
         self.use_packing = use_packing
         self.max_len = max_len
 
@@ -229,7 +230,7 @@ class Elmo(torch.nn.Module):
 
 
 def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparameters.VOCAB_SIZE, distribution=None,
-              epochs=data_hyperparameters.WORD_EMBEDDING_EPOCHS,
+              epochs=data_hyperparameters.WORD_EMBEDDING_EPOCHS, lr=1e-2,
               embedding_dim=data_hyperparameters.WORD_EMBEDDING_DIMENSION,
               context_size=data_hyperparameters.CONTEXT_SIZE,
               inner_product_clamp=data_hyperparameters.INNER_PRODUCT_CLAMP,
@@ -245,7 +246,7 @@ def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparam
         distribution_tensor = torch.tensor(distribution, dtype=torch.float, device=device)
     if data_hyperparameters.USE_CUDA:
         model.cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1.)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=1, verbose=True)
     write_log('Training on {0} batches and validating on {1} batches'.format(len(train_loader), len(valid_loader)),
               logger)

@@ -23,9 +23,11 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
     start_epoch = model.num_epochs_trained
     for epoch in range(start_epoch, epochs + start_epoch):
         now_begin_epoch = datetime.now()
-        write_log('Running epoch {0} of {1}'.format(epoch + 1, epochs + start_epoch), logger)
-        model.train()
         model.latest_scheduled_lr = optimiser.param_groups[0]['lr']
+        model.lr_history.append(model.latest_scheduled_lr)
+        write_log('Running epoch {0} of {1} with learning rate {2}'.format(epoch + 1, epochs + start_epoch,
+                                                                           model.latest_scheduled_lr), logger)
+        model.train()
         loss = 0.
         for xb, yb in train_data:
             batch_loss = loss_function(model(xb), yb)

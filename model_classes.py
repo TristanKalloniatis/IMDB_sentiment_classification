@@ -24,6 +24,7 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.valid_losses = []
         self.num_epochs_trained = 0
         self.latest_scheduled_lr = None
+        self.lr_history = []
         self.train_time = 0.
         self.num_trainable_params = 0
         self.instantiated = datetime.datetime.now()
@@ -55,7 +56,7 @@ class BaseModelClass(torch.nn.Module, ABC):
                       'vocab_size': self.vocab_size, 'tokenizer': self.tokenizer, 'batch_size': self.batch_size}
         return model_data
 
-    def plot_losses(self):
+    def plot_losses(self, include_lrs=False):
         fig, ax = plt.subplots()
         ax.plot(range(self.num_epochs_trained), self.train_losses, label='Training')
         ax.plot(range(self.num_epochs_trained), self.valid_losses, label='Validation')
@@ -77,6 +78,15 @@ class BaseModelClass(torch.nn.Module, ABC):
             ax.set_title('Accuracies for {0}'.format(self.name))
             ax.legend()
             plt.savefig('accuracies_{0}.png'.format(self.name))
+
+        if include_lrs:
+            fig, ax = plt.subplots()
+            ax.plot(range(self.num_epochs_trained), self.lr_history, label='Learning rate')
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Learning rate')
+            ax.set_title('Learning rates for {0}'.format(self.name))
+            ax.legend()
+            plt.savefig('learning_rates_{0}.png'.format(self.name))
 
 
 class AverageEmbeddingModel(BaseModelClass, ABC):
@@ -256,8 +266,8 @@ class PositionalEncoding(torch.nn.Module):
 
 class TransformerEncoderLayer(BaseModelClass, ABC):
     def __init__(self, max_len, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
-                 dim_feedforward=1024,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='last', num_categories=2,
+                 dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='max', num_categories=2,
                  name='TransformerEncoderLayer'):
         super().__init__()
         assert embedding_dimension % nhead == 0
@@ -266,9 +276,10 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
         self.embedding_dimension = embedding_dimension
         self.pool_type = pool_type
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
-        self.positional_encoder = PositionalEncoding(embedding_dimension, max_len=max_len)
+        self.positional_encoder = PositionalEncoding(embedding_dimension, max_len=max_len,
+                                                     dropout=positional_encoding_dropout)
         self.encoder_layer = torch.nn.TransformerEncoderLayer(d_model=embedding_dimension, nhead=nhead,
-                                                              dim_feedforward=dim_feedforward)
+                                                              dim_feedforward=dim_feedforward, dropout=dropout)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
         self.finish_setup()
 
@@ -284,8 +295,8 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
 
 class TransformerEncoder(BaseModelClass, ABC):
     def __init__(self, num_layers, max_len=200, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
-                 dim_feedforward=1024,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='last', num_categories=2,
+                 dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='max', num_categories=2,
                  name='TransformerEncoder'):
         super().__init__()
         assert embedding_dimension % nhead == 0
@@ -294,9 +305,10 @@ class TransformerEncoder(BaseModelClass, ABC):
         self.embedding_dimension = embedding_dimension
         self.pool_type = pool_type
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
-        self.positional_encoder = PositionalEncoding(embedding_dimension, max_len=max_len)
+        self.positional_encoder = PositionalEncoding(embedding_dimension, max_len=max_len,
+                                                     dropout=positional_encoding_dropout)
         self.encoder_layer = torch.nn.TransformerEncoderLayer(d_model=embedding_dimension, nhead=nhead,
-                                                              dim_feedforward=dim_feedforward)
+                                                              dim_feedforward=dim_feedforward, dropout=dropout)
         self.encoder = torch.nn.TransformerEncoder(self.encoder_layer, num_layers)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
         self.finish_setup()
