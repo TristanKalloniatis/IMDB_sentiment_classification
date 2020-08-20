@@ -13,6 +13,9 @@ def get_accuracy(loader, model):
     with torch.no_grad():
         accuracy = 0.
         for xb, yb in loader:
+            if data_hyperparameters.USE_CUDA and not data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE:
+                xb = xb.cuda()
+                yb = yb.cuda()
             accuracy += model(xb).argmax(dim=1).eq(yb).float().mean().item()
     return accuracy / len(loader)
 

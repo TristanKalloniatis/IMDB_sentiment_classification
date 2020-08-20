@@ -19,7 +19,7 @@ FREQS_FILE = f"imdb_freqs_{TOKENIZER}_{VOCAB_SIZE}.pkl"
 tokenizer = torchtext.data.utils.get_tokenizer(TOKENIZER)
 LOG_FILE = 'embeddings'
 logger = create_logger(LOG_FILE)
-device = torch.device('cuda' if data_hyperparameters.USE_CUDA else 'cpu')
+device = torch.device('cuda' if data_hyperparameters.USE_CUDA and data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE else 'cpu')
 
 if not os.path.exists('.data/'):
     os.mkdir('.data/')
@@ -81,7 +81,8 @@ def noise_distribution(frequencies, unigram_distribution_power=data_hyperparamet
 
 def produce_negative_samples(distribution, num_negative_samples=data_hyperparameters.NUM_NEGATIVE_SAMPLES,
                              batch_size=data_hyperparameters.WORD_EMBEDDING_BATCH_SIZE):
-    return torch.multinomial(distribution, batch_size * num_negative_samples, replacement=True).view(batch_size, -1).to(device)
+    negative_samples =  torch.multinomial(distribution, batch_size * num_negative_samples, replacement=True).view(batch_size, -1)
+    return negative_samples.cuda() if data_hyperparameters.USE_CUDA else negative_samples
 
 
 def pre_process_words(words, algorithm, context_size=data_hyperparameters.CONTEXT_SIZE,
@@ -256,6 +257,9 @@ def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparam
         model.train()
         total_loss = 0
         for xb, yb in train_loader:
+            if data_hyperparameters.USE_CUDA and not data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE:
+                xb = xb.cuda()
+                yb = yb.cuda()
             if algorithm.upper() == 'CBOW':
                 predictions = model(xb)
                 loss = loss_function(predictions, yb)
@@ -274,6 +278,9 @@ def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparam
         with torch.no_grad():
             valid_loss = 0
             for xb, yb in valid_loader:
+                if data_hyperparameters.USE_CUDA and not data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE:
+                    xb = xb.cuda()
+                    yb = yb.cuda()
                 if algorithm.upper() == 'CBOW':
                     valid_loss += loss_function(model(xb), yb).item()
                 elif algorithm.upper() == 'SGNS':

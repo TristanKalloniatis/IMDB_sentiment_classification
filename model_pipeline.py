@@ -30,6 +30,9 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
         model.train()
         loss = 0.
         for xb, yb in train_data:
+            if data_hyperparameters.USE_CUDA and not data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE:
+                xb = xb.cuda()
+                yb = yb.cuda()
             batch_loss = loss_function(model(xb), yb)
             loss += batch_loss.item() / len(train_data)
             optimiser.zero_grad()
@@ -44,7 +47,14 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
                 write_log('Training accuracy: {0}'.format(accuracy), logger)
                 model.train_accuracies[epoch + 1] = accuracy
         with torch.no_grad():
-            loss = sum([loss_function(model(xb), yb).item() for xb, yb in valid_data]) / len(valid_data)
+            if data_hyperparameters.USE_CUDA and not data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE:
+                loss = 0.
+                for xb, yb in valid_data:
+                    xb = xb.cuda()
+                    yb = yb.cuda()
+                    loss += loss_function(model(xb), yb).item() / len(valid_data)
+            else:
+                loss = sum([loss_function(model(xb), yb).item() for xb, yb in valid_data]) / len(valid_data)
         model.valid_losses.append(loss)
         scheduler.step(loss)
         write_log('Validation loss: {0}'.format(loss), logger)

@@ -19,7 +19,7 @@ TEST_LABELS_FILE = f"imdb_test_labels_{TOKENIZER}_{VOCAB_SIZE}.pkl"
 tokenizer = torchtext.data.utils.get_tokenizer(TOKENIZER)
 LOG_FILE = 'data_downloader'
 logger = create_logger(LOG_FILE)
-device = torch.device('cuda' if data_hyperparameters.USE_CUDA else 'cpu')
+device = torch.device('cuda' if data_hyperparameters.USE_CUDA and data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE else 'cpu')
 
 if not os.path.exists('.data/'):
     os.mkdir('.data/')
