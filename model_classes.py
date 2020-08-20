@@ -41,6 +41,10 @@ class BaseModelClass(torch.nn.Module, ABC):
         self.batch_size = data_hyperparameters.BATCH_SIZE
         self.train_accuracies = {}
         self.valid_accuracies = {}
+        self.train_correct_confidences = {}
+        self.train_incorrect_confidences = {}
+        self.valid_correct_confidences = {}
+        self.valid_incorrect_confidences = {}
 
     def count_parameters(self):
         self.num_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -63,7 +67,7 @@ class BaseModelClass(torch.nn.Module, ABC):
                       'vocab_size': self.vocab_size, 'tokenizer': self.tokenizer, 'batch_size': self.batch_size}
         return model_data
 
-    def plot_losses(self, include_lrs=False):
+    def plot_losses(self, include_lrs=True):
         fig, ax = plt.subplots()
         ax.plot(range(self.num_epochs_trained), self.train_losses, label='Training')
         ax.plot(range(self.num_epochs_trained), self.valid_losses, label='Validation')
@@ -85,6 +89,23 @@ class BaseModelClass(torch.nn.Module, ABC):
             ax.set_title('Accuracies for {0}'.format(self.name))
             ax.legend()
             plt.savefig('learning_curves/accuracies_{0}.png'.format(self.name))
+
+        if len(self.train_correct_confidences) != 0:
+            fig, ax = plt.subplots()
+            epochs = list(self.train_correct_confidences.keys())
+            train_correct_confidences = list(self.train_correct_confidences.values())
+            train_incorrect_confidences = list(self.train_incorrect_confidences.values())
+            valid_correct_confidences = list(self.valid_correct_confidences.values())
+            valid_incorrect_confidences = list(self.valid_incorrect_confidences.values())
+            ax.scatter(epochs, train_correct_confidences, label='Training (correct predictions)')
+            ax.scatter(epochs, train_incorrect_confidences, label='Training (correct predictions)')
+            ax.scatter(epochs, valid_correct_confidences, label='Validation (correct predictions)')
+            ax.scatter(epochs, valid_incorrect_confidences, label='Validation (correct predictions)')
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Confidence')
+            ax.set_title('Confidences for {0}'.format(self.name))
+            ax.legend()
+            plt.savefig('learning_curves/confidences_{0}.png'.format(self.name))
 
         if include_lrs:
             fig, ax = plt.subplots()

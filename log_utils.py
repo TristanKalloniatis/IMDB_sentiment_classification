@@ -1,7 +1,10 @@
 from datetime import datetime
 import logging
 from sys import stdout
+import os
 
+if not os.path.exists('log_files/'):
+    os.mkdir('log_files/')
 
 def write_log(message, log_object):
     timestamp = datetime.now()
