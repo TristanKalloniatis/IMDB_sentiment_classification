@@ -4,6 +4,10 @@ import data_hyperparameters
 import datetime
 import matplotlib.pyplot as plt
 from math import nan, log
+import os
+
+if not os.path.exists('learning_curves/'):
+    os.mkdir('learning_curves/')
 
 
 def get_accuracy(loader, model):
@@ -67,7 +71,7 @@ class BaseModelClass(torch.nn.Module, ABC):
         ax.set_ylabel('Loss')
         ax.set_title('Learning curve for {0}'.format(self.name))
         ax.legend()
-        plt.savefig('learning_curve_{0}.png'.format(self.name))
+        plt.savefig('learning_curves/learning_curve_{0}.png'.format(self.name))
 
         if len(self.train_accuracies) != 0:
             fig, ax = plt.subplots()
@@ -80,7 +84,7 @@ class BaseModelClass(torch.nn.Module, ABC):
             ax.set_ylabel('Accuracy')
             ax.set_title('Accuracies for {0}'.format(self.name))
             ax.legend()
-            plt.savefig('accuracies_{0}.png'.format(self.name))
+            plt.savefig('learning_curves/accuracies_{0}.png'.format(self.name))
 
         if include_lrs:
             fig, ax = plt.subplots()
@@ -89,7 +93,7 @@ class BaseModelClass(torch.nn.Module, ABC):
             ax.set_ylabel('Learning rate')
             ax.set_title('Learning rates for {0}'.format(self.name))
             ax.legend()
-            plt.savefig('learning_rates_{0}.png'.format(self.name))
+            plt.savefig('learning_curves/learning_rates_{0}.png'.format(self.name))
 
 
 class AverageEmbeddingModel(BaseModelClass, ABC):

@@ -302,7 +302,7 @@ def train_w2v(model_name, train_loader, valid_loader, vocab_size=data_hyperparam
     ax.set_ylabel('Loss')
     ax.set_title('Learning curve for model {0}'.format(model_name))
     ax.legend()
-    plt.savefig('{0}_learning_curve_{1}_{2}_{3}.png'.format(model_name, embedding_dim, algorithm, context_size))
+    plt.savefig('learning_curves/{0}_learning_curve_{1}_{2}_{3}.png'.format(model_name, embedding_dim, algorithm, context_size))
 
     return model
 

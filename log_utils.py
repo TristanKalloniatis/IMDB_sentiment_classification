@@ -12,5 +12,5 @@ def write_log(message, log_object):
 def create_logger(log_filename):
     logger = logging.getLogger()
     logging.basicConfig(level=logging.INFO, stream=stdout)
-    logger.addHandler(logging.FileHandler('log_' + log_filename + '.txt'))
+    logger.addHandler(logging.FileHandler('log_files/log_{0}_{1}.txt'.format(log_filename, datetime.now())))
     return logger
