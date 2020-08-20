@@ -185,7 +185,7 @@ class GRUClassifier(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.dropout = torch.nn.Dropout(p=dropout)
         self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                bidirectional=bidirectional, batch_first=True)
+                                bidirectional=bidirectional)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
         self.name = name
@@ -194,11 +194,10 @@ class GRUClassifier(BaseModelClass, ABC):
     def forward(self, inputs):
         input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
         embeds = self.embedding(input_truncated)
-        dropped_embeds = self.dropout(embeds)
+        dropped_embeds = self.dropout(embeds).transpose(0, 1)
         if self.use_packing:
             input_length = torch.sum(input_truncated != 1, dim=-1)
-            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, batch_first=True,
-                                                                     enforce_sorted=False)
+            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, enforce_sorted=False)
         _, gru_hn = self.GRU(dropped_embeds)
         gru_final_output = torch.flatten(
             gru_hn.view(self.num_layers, self.num_directions, -1, self.hidden_size)[-1, :, :, :].transpose(0, 1),
@@ -224,7 +223,7 @@ class LSTMClassifier(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.dropout = torch.nn.Dropout(p=dropout)
         self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                  bidirectional=bidirectional, batch_first=True)
+                                  bidirectional=bidirectional)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
         self.name = name
@@ -233,11 +232,10 @@ class LSTMClassifier(BaseModelClass, ABC):
     def forward(self, inputs):
         input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
         embeds = self.embedding(input_truncated)
-        dropped_embeds = self.dropout(embeds)
+        dropped_embeds = self.dropout(embeds).transpose(0, 1)
         if self.use_packing:
             input_length = torch.sum(input_truncated != 1, dim=-1)
-            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, batch_first=True,
-                                                                     enforce_sorted=False)
+            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, enforce_sorted=False)
         _, (lstm_hn, _) = self.LSTM(dropped_embeds)
         lstm_final_output = torch.flatten(
             lstm_hn.view(self.num_layers, self.num_directions, -1, self.hidden_size)[-1, :, :, :].transpose(0, 1),
@@ -291,7 +289,7 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
         embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
         transforms = self.encoder_layer(positional_encodings)
-        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0]  # todo: try mean?
+        pool = torch.mean(transforms, dim=0) if self.pool_type == 'mean' else torch.max(transforms, dim=0)[0]
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)
 
@@ -321,6 +319,6 @@ class TransformerEncoder(BaseModelClass, ABC):
         embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
         transforms = self.encoder(positional_encodings)
-        pool = transforms[-1] if self.pool_type == 'last' else torch.max(transforms, dim=0)[0]  # todo: try mean?
+        pool = torch.mean(transforms, dim=0) if self.pool_type == 'mean' else torch.max(transforms, dim=0)[0]
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)
