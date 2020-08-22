@@ -11,29 +11,8 @@ LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
 
 
-def model_confidence(model, data):
-    model.eval()
-    correct_prediction_probs = 0.
-    incorrect_prediction_probs = 0.
-    num_correct = 0
-    num_incorrect = 0
-    with torch.no_grad():
-        for xb, yb in data:
-            if data_hyperparameters.USE_CUDA and not data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE:
-                xb = xb.cuda()
-                yb = yb.cuda()
-            log_probs, predictions = torch.max(model(xb), dim=-1)
-            probs = torch.exp(log_probs)
-            correct_predictions_mask = torch.where(predictions == yb, torch.ones_like(yb), torch.zeros_like(yb))
-            num_correct += torch.sum(correct_predictions_mask).item()
-            num_incorrect += torch.sum(1 - correct_predictions_mask).item()
-            correct_prediction_probs += torch.sum(correct_predictions_mask * probs).item()
-            incorrect_prediction_probs += torch.sum((1 - correct_predictions_mask) * probs).item()
-    return correct_prediction_probs / num_correct, incorrect_prediction_probs / num_incorrect
-
-
 def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, patience=data_hyperparameters.PATIENCE,
-          report_accuracy_every=5, report_model_confidence_every=5):
+          report_accuracy_every=data_hyperparameters.REPORT_ACCURACY_EVERY):
     loss_function = torch.nn.NLLLoss()
     if data_hyperparameters.USE_CUDA:
         model.cuda()
@@ -64,14 +43,14 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
         model.eval()
         if report_accuracy_every is not None:
             if (epoch + 1) % report_accuracy_every == 0:
-                accuracy = get_accuracy(train_data, model)
+                accuracy, mean_correct_prediction_probs, mean_incorrect_prediction_probs = get_accuracy(train_data,
+                                                                                                        model,
+                                                                                                        also_report_model_confidences=True)
                 write_log('Training accuracy: {0}'.format(accuracy), logger)
                 model.train_accuracies[epoch + 1] = accuracy
-        if report_model_confidence_every is not None:
-            if (epoch + 1) % report_model_confidence_every == 0:
-                mean_correct_prediction_probs, mean_incorrect_prediction_probs = model_confidence(model, train_data)
-                write_log('Model confidence: {0} (correct predictions), {1} (incorrect predictions)'.format(mean_correct_prediction_probs,
-                                                                                                            mean_incorrect_prediction_probs),
+                write_log('Model confidence: {0} (correct predictions), {1} (incorrect predictions)'.format(
+                    mean_correct_prediction_probs,
+                    mean_incorrect_prediction_probs),
                           logger)
                 model.train_correct_confidences[epoch + 1] = mean_correct_prediction_probs
                 model.train_incorrect_confidences[epoch + 1] = mean_incorrect_prediction_probs
@@ -89,14 +68,14 @@ def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, pat
         write_log('Validation loss: {0}'.format(loss), logger)
         if report_accuracy_every is not None:
             if (epoch + 1) % report_accuracy_every == 0:
-                accuracy = get_accuracy(valid_data, model)
+                accuracy, mean_correct_prediction_probs, mean_incorrect_prediction_probs = get_accuracy(valid_data,
+                                                                                                        model,
+                                                                                                        also_report_model_confidences=True)
                 write_log('Validation accuracy: {0}'.format(accuracy), logger)
                 model.valid_accuracies[epoch + 1] = accuracy
-        if report_model_confidence_every is not None:
-            if (epoch + 1) % report_model_confidence_every == 0:
-                mean_correct_prediction_probs, mean_incorrect_prediction_probs = model_confidence(model, valid_data)
-                write_log('Model confidence: {0} (correct predictions), {1} (incorrect predictions)'.format(mean_correct_prediction_probs,
-                                                                                                            mean_incorrect_prediction_probs),
+                write_log('Model confidence: {0} (correct predictions), {1} (incorrect predictions)'.format(
+                    mean_correct_prediction_probs,
+                    mean_incorrect_prediction_probs),
                           logger)
                 model.valid_correct_confidences[epoch + 1] = mean_correct_prediction_probs
                 model.valid_incorrect_confidences[epoch + 1] = mean_incorrect_prediction_probs

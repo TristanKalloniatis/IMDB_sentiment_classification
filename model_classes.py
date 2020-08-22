@@ -10,18 +10,32 @@ if not os.path.exists('learning_curves/'):
     os.mkdir('learning_curves/')
 
 
-def get_accuracy(loader, model):
+def get_accuracy(loader, model, also_report_model_confidences=False):
     if data_hyperparameters.USE_CUDA:
         model.cuda()
     model.eval()
     with torch.no_grad():
         accuracy = 0.
+        correct_prediction_probs = 0.
+        incorrect_prediction_probs = 0.
+        num_correct = 0
+        num_incorrect = 0
         for xb, yb in loader:
             if data_hyperparameters.USE_CUDA and not data_hyperparameters.STORE_DATA_ON_GPU_IF_AVAILABLE:
                 xb = xb.cuda()
                 yb = yb.cuda()
-            accuracy += model(xb).argmax(dim=1).eq(yb).float().mean().item()
-    return accuracy / len(loader)
+            model_output = model(xb)
+            accuracy += model_output.argmax(dim=1).eq(yb).float().mean().item()
+            if also_report_model_confidences:
+                log_probs, predictions = torch.max(model_output, dim=-1)
+                probs = torch.exp(log_probs)
+                correct_predictions_mask = torch.where(predictions == yb, torch.ones_like(yb), torch.zeros_like(yb))
+                num_correct += torch.sum(correct_predictions_mask).item()
+                num_incorrect += torch.sum(1 - correct_predictions_mask).item()
+                correct_prediction_probs += torch.sum(correct_predictions_mask * probs).item()
+                incorrect_prediction_probs += torch.sum((1 - correct_predictions_mask) * probs).item()
+    return accuracy / len(loader), correct_prediction_probs / num_correct, incorrect_prediction_probs / num_incorrect \
+        if also_report_model_confidences else accuracy / len(loader)
 
 
 class BaseModelClass(torch.nn.Module, ABC):
@@ -133,6 +147,7 @@ class AverageEmbeddingModel(BaseModelClass, ABC):
         return torch.nn.functional.log_softmax(out, dim=-1)
 
 
+# WARNING: THIS CLASS EXPECTS A DIFFERENT DATA FORMAT SO SHOULD NOT BE USED WITH DEFAULT DATALOADER
 class LogisticRegressionBOW(BaseModelClass, ABC):
     def __init__(self, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='BOWLR'):
         super().__init__()
@@ -291,7 +306,7 @@ class PositionalEncoding(torch.nn.Module):
 
 
 class TransformerEncoderLayer(BaseModelClass, ABC):
-    def __init__(self, max_len, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
+    def __init__(self, max_len=500, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
                  dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='max', num_categories=2,
                  name='TransformerEncoderLayer'):
@@ -320,7 +335,7 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
 
 
 class TransformerEncoder(BaseModelClass, ABC):
-    def __init__(self, num_layers, max_len=200, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
+    def __init__(self, num_layers, max_len=500, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
                  dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='max', num_categories=2,
                  name='TransformerEncoder'):
@@ -347,3 +362,14 @@ class TransformerEncoder(BaseModelClass, ABC):
         pool = torch.mean(transforms, dim=0) if self.pool_type == 'mean' else torch.max(transforms, dim=0)[0]
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class MyTemplateModelClass(BaseModelClass, ABC):
+    def __init__(self, model_parameters, name='template'):
+        super().__init__()
+        self.model_parameters = model_parameters
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        pass
