@@ -34,8 +34,10 @@ def get_accuracy(loader, model, also_report_model_confidences=False):
                 num_incorrect += torch.sum(1 - correct_predictions_mask).item()
                 correct_prediction_probs += torch.sum(correct_predictions_mask * probs).item()
                 incorrect_prediction_probs += torch.sum((1 - correct_predictions_mask) * probs).item()
-    return accuracy / len(loader), correct_prediction_probs / num_correct, incorrect_prediction_probs / num_incorrect \
-        if also_report_model_confidences else accuracy / len(loader)
+    if also_report_model_confidences:
+        return accuracy / len(loader), correct_prediction_probs / num_correct, incorrect_prediction_probs / num_incorrect
+    else:
+        return accuracy / len(loader)
 
 
 class BaseModelClass(torch.nn.Module, ABC):
@@ -365,7 +367,7 @@ class TransformerEncoder(BaseModelClass, ABC):
 
 
 class MyTemplateModelClass(BaseModelClass, ABC):
-    def __init__(self, model_parameters, name='template'):
+    def __init__(self, model_parameters, name='template', num_categories=2):
         super().__init__()
         self.model_parameters = model_parameters
         self.name = name

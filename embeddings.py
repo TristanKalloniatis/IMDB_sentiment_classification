@@ -24,6 +24,9 @@ device = torch.device('cuda' if data_hyperparameters.USE_CUDA and data_hyperpara
 if not os.path.exists('.data/'):
     os.mkdir('.data/')
 
+if not os.path.exists('trained_embeddings/'):
+    os.mkdir('trained_embeddings/')
+
 
 def get_data():
     if not os.path.exists(TOKENIZER_FILE):

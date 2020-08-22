@@ -10,6 +10,9 @@ from pickle import dump, load
 LOG_FILE = 'model_pipeline'
 logger = create_logger(LOG_FILE)
 
+if not os.path.exists('saved_models/'):
+    os.mkdir('saved_models/')
+
 
 def train(model, train_data, valid_data, epochs=data_hyperparameters.EPOCHS, patience=data_hyperparameters.PATIENCE,
           report_accuracy_every=data_hyperparameters.REPORT_ACCURACY_EVERY):
@@ -101,22 +104,22 @@ def report_statistics(model, train_data, valid_data, test_data):
 
 
 def save_model(model):
-    torch.save(model.state_dict(), model.name + '.pt')
+    torch.save(model.state_dict(), 'saved_models/{0}.pt'.format(model.name))
     model_data = {'train_losses': model.train_losses, 'valid_losses': model.valid_losses,
                   'num_epochs_trained': model.num_epochs_trained, 'latest_scheduled_lr': model.latest_scheduled_lr,
                   'train_time': model.train_time, 'num_trainable_params': model.num_trainable_params,
                   'instantiated': model.instantiated, 'name': model.name, 'vocab_size': model.vocab_size,
                   'tokenizer': model.tokenizer, 'batch_size': model.batch_size,
                   'train_accuracies': model.train_accuracies, 'valid_accuracies': model.valid_accuracies}
-    outfile = open(model.name + '_model_data', 'wb')
+    outfile = open('saved_models/{0}_model_data.pkl'.format(model.name), 'wb')
     dump(model_data, outfile)
     outfile.close()
 
 
 def load_model_state(model, model_name):
-    model.load_state_dict(torch.load(model_name + '.pt'))
+    model.load_state_dict(torch.load('saved_models/{0}.pt'.format(model_name)))
     write_log('Loaded model {0} weights'.format(model_name), logger)
-    infile = open(model_name + '_model_data', 'rb')
+    infile = open('saved_models/{0}_model_data.pkl'.format(model_name), 'rb')
     model_data = load(infile)
     infile.close()
     model.train_losses = model_data['train_losses']
