@@ -309,12 +309,13 @@ class PositionalEncoding(torch.nn.Module):
 
 class TransformerEncoderLayer(BaseModelClass, ABC):
     def __init__(self, max_len=500, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
-                 dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1,
+                 dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1, mask_pad_tokens=True,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='max', num_categories=2,
                  name='TransformerEncoderLayer'):
         super().__init__()
         assert embedding_dimension % nhead == 0
         self.max_len = max_len
+        self.mask_pad_tokens = mask_pad_tokens
         self.name = name
         self.embedding_dimension = embedding_dimension
         self.pool_type = pool_type
@@ -330,20 +331,33 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
         input_truncated = inputs[:, :self.max_len]
         embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
-        transforms = self.encoder_layer(positional_encodings)
-        pool = torch.mean(transforms, dim=0) if self.pool_type == 'mean' else torch.max(transforms, dim=0)[0]
+        if self.mask_pad_tokens:
+            src_key_padding_mask = input_truncated == 1
+            transforms = self.encoder_layer(positional_encodings, src_key_padding_mask=src_key_padding_mask)
+            non_pad = (1 - src_key_padding_mask.float()).transpose(0, 1).unsqueeze(-1)
+            if self.pool_type == 'mean':
+                non_pad_sum = torch.sum(non_pad, dim=0)
+                non_pad_transforms_sum = torch.sum(non_pad * transforms, dim=0)
+                pool = non_pad_transforms_sum / non_pad_sum
+            else:
+                masked_transforms = transforms.masked_fill(src_key_padding_mask.transpose(0,1).unsqueeze(-1), -float('inf'))
+                pool = torch.max(masked_transforms, dim=0)[0]
+        else:
+            transforms = self.encoder_layer(positional_encodings)
+            pool = torch.mean(transforms, dim=0) if self.pool_type == 'mean' else torch.max(transforms, dim=0)[0]
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)
 
 
 class TransformerEncoder(BaseModelClass, ABC):
     def __init__(self, num_layers, max_len=500, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
-                 dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1,
+                 dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1, mask_pad_tokens=True,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='max', num_categories=2,
                  name='TransformerEncoder'):
         super().__init__()
         assert embedding_dimension % nhead == 0
         self.max_len = max_len
+        self.mask_pad_tokens = mask_pad_tokens
         self.name = name
         self.embedding_dimension = embedding_dimension
         self.pool_type = pool_type
@@ -360,8 +374,20 @@ class TransformerEncoder(BaseModelClass, ABC):
         input_truncated = inputs[:, :self.max_len]
         embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
-        transforms = self.encoder(positional_encodings)
-        pool = torch.mean(transforms, dim=0) if self.pool_type == 'mean' else torch.max(transforms, dim=0)[0]
+        if self.mask_pad_tokens:
+            src_key_padding_mask = input_truncated == 1
+            transforms = self.encoder(positional_encodings, src_key_padding_mask=src_key_padding_mask)
+            non_pad = (1 - src_key_padding_mask.float()).transpose(0, 1).unsqueeze(-1)
+            if self.pool_type == 'mean':
+                non_pad_sum = torch.sum(non_pad, dim=0)
+                non_pad_transforms_sum = torch.sum(non_pad * transforms, dim=0)
+                pool = non_pad_transforms_sum / non_pad_sum
+            else:
+                masked_transforms = transforms.masked_fill(src_key_padding_mask.transpose(0,1).unsqueeze(-1), -float('inf'))
+                pool = torch.max(masked_transforms, dim=0)[0]
+        else:
+            transforms = self.encoder(positional_encodings)
+            pool = torch.mean(transforms, dim=0) if self.pool_type == 'mean' else torch.max(transforms, dim=0)[0]
         out = self.linear(pool)
         return torch.nn.functional.log_softmax(out, dim=-1)
 
