@@ -150,7 +150,7 @@ class AverageEmbeddingModel(BaseModelClass, ABC):
 
 
 # WARNING: THIS CLASS EXPECTS A DIFFERENT DATA FORMAT SO SHOULD NOT BE USED WITH DEFAULT DATALOADER
-class LogisticRegressionBOW(BaseModelClass, ABC):
+class BOWLogisticRegression(BaseModelClass, ABC):
     def __init__(self, vocab_size=data_hyperparameters.VOCAB_SIZE, num_categories=2, name='BOWLR'):
         super().__init__()
         self.name = name
@@ -214,7 +214,7 @@ class ConvMultiGram(BaseModelClass, ABC):
 class GRUClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, hidden_size=100, bidirectional=False,
-                 num_categories=2, use_packing=False, name='GRU'):
+                 num_categories=2, use_packing=False, batch_first=True, name='GRU'):
         super().__init__()
         self.bidirectional = bidirectional
         self.max_len = max_len
@@ -223,11 +223,12 @@ class GRUClassifier(BaseModelClass, ABC):
         self.num_directions = 2 if bidirectional else 1
         self.hidden_size_scaled = hidden_size * self.num_directions
         self.use_packing = use_packing
+        self.batch_first = batch_first
         self.num_layers = num_layers
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.dropout = torch.nn.Dropout(p=dropout)
         self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                bidirectional=bidirectional)
+                                bidirectional=bidirectional, batch_first=batch_first)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
         self.name = name
@@ -236,10 +237,13 @@ class GRUClassifier(BaseModelClass, ABC):
     def forward(self, inputs):
         input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
         embeds = self.embedding(input_truncated)
-        dropped_embeds = self.dropout(embeds).transpose(0, 1)
+        dropped_embeds = self.dropout(embeds)
+        if not self.batch_first:
+            dropped_embeds = dropped_embeds.transpose(0, 1)
         if self.use_packing:
             input_length = torch.sum(input_truncated != 1, dim=-1)
-            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, enforce_sorted=False)
+            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, enforce_sorted=False,
+                                                                     batch_first=self.batch_first)
         _, gru_hn = self.GRU(dropped_embeds)
         gru_final_output = torch.flatten(
             gru_hn.view(self.num_layers, self.num_directions, -1, self.hidden_size)[-1, :, :, :].transpose(0, 1),
@@ -252,7 +256,7 @@ class GRUClassifier(BaseModelClass, ABC):
 class LSTMClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, hidden_size=100, bidirectional=False,
-                 num_categories=2, use_packing=False, name='LSTM'):
+                 num_categories=2, use_packing=False, batch_first=True, name='LSTM'):
         super().__init__()
         self.bidirectional = bidirectional
         self.max_len = max_len
@@ -261,11 +265,12 @@ class LSTMClassifier(BaseModelClass, ABC):
         self.num_directions = 2 if bidirectional else 1
         self.hidden_size_scaled = hidden_size * self.num_directions
         self.use_packing = use_packing
+        self.batch_first = batch_first
         self.num_layers = num_layers
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.dropout = torch.nn.Dropout(p=dropout)
         self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                  bidirectional=bidirectional)
+                                  bidirectional=bidirectional, batch_first=batch_first)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
         self.name = name
@@ -274,10 +279,13 @@ class LSTMClassifier(BaseModelClass, ABC):
     def forward(self, inputs):
         input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
         embeds = self.embedding(input_truncated)
-        dropped_embeds = self.dropout(embeds).transpose(0, 1)
+        dropped_embeds = self.dropout(embeds)
+        if not self.batch_first:
+            dropped_embeds = dropped_embeds.transpose(0, 1)
         if self.use_packing:
             input_length = torch.sum(input_truncated != 1, dim=-1)
-            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, enforce_sorted=False)
+            dropped_embeds = torch.nn.utils.rnn.pack_padded_sequence(dropped_embeds, input_length, enforce_sorted=False,
+                                                                     batch_first=self.batch_first)
         _, (lstm_hn, _) = self.LSTM(dropped_embeds)
         lstm_final_output = torch.flatten(
             lstm_hn.view(self.num_layers, self.num_directions, -1, self.hidden_size)[-1, :, :, :].transpose(0, 1),
@@ -309,8 +317,8 @@ class PositionalEncoding(torch.nn.Module):
 
 class TransformerEncoderLayer(BaseModelClass, ABC):
     def __init__(self, max_len=500, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
-                 dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1, mask_pad_tokens=True,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='max', num_categories=2,
+                 dim_feedforward=512, dropout=0.4, positional_encoding_dropout=0.2, mask_pad_tokens=True,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='mean', num_categories=2,
                  name='TransformerEncoderLayer'):
         super().__init__()
         assert embedding_dimension % nhead == 0
@@ -332,10 +340,10 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
         embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
         if self.mask_pad_tokens:
-            src_key_padding_mask = input_truncated == 1
+            src_key_padding_mask = (input_truncated == 1)
             transforms = self.encoder_layer(positional_encodings, src_key_padding_mask=src_key_padding_mask)
-            non_pad = (1 - src_key_padding_mask.float()).transpose(0, 1).unsqueeze(-1)
             if self.pool_type == 'mean':
+                non_pad = (1 - src_key_padding_mask.float()).transpose(0, 1).unsqueeze(-1)
                 non_pad_sum = torch.sum(non_pad, dim=0)
                 non_pad_transforms_sum = torch.sum(non_pad * transforms, dim=0)
                 pool = non_pad_transforms_sum / non_pad_sum
@@ -351,8 +359,8 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
 
 class TransformerEncoder(BaseModelClass, ABC):
     def __init__(self, num_layers, max_len=500, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
-                 dim_feedforward=1024, dropout=0.1, positional_encoding_dropout=0.1, mask_pad_tokens=True,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='max', num_categories=2,
+                 dim_feedforward=512, dropout=0.4, positional_encoding_dropout=0.2, mask_pad_tokens=True,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='mean', num_categories=2,
                  name='TransformerEncoder'):
         super().__init__()
         assert embedding_dimension % nhead == 0
@@ -375,10 +383,10 @@ class TransformerEncoder(BaseModelClass, ABC):
         embeds = self.embedding(input_truncated).transpose(0, 1)
         positional_encodings = self.positional_encoder(embeds)
         if self.mask_pad_tokens:
-            src_key_padding_mask = input_truncated == 1
+            src_key_padding_mask = (input_truncated == 1)
             transforms = self.encoder(positional_encodings, src_key_padding_mask=src_key_padding_mask)
-            non_pad = (1 - src_key_padding_mask.float()).transpose(0, 1).unsqueeze(-1)
             if self.pool_type == 'mean':
+                non_pad = (1 - src_key_padding_mask.float()).transpose(0, 1).unsqueeze(-1)
                 non_pad_sum = torch.sum(non_pad, dim=0)
                 non_pad_transforms_sum = torch.sum(non_pad * transforms, dim=0)
                 pool = non_pad_transforms_sum / non_pad_sum
