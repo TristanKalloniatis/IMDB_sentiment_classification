@@ -164,33 +164,38 @@ class BOWLogisticRegression(BaseModelClass, ABC):
 
 class ConvNGram(BaseModelClass, ABC):
     def __init__(self, kernel_size, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_features=100, num_categories=2, name='ConvN'):
+                 dropout=data_hyperparameters.DROPOUT, embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_features=data_hyperparameters.NUM_CONV_FEATURES,
+                 num_categories=2, name='ConvN'):
         super().__init__()
         self.name = name
         self.embedding_dimension = embedding_dimension
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.conv = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=num_features,
                                     kernel_size=kernel_size)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(embedding_dimension, num_categories)
         self.finish_setup()
 
     def forward(self, inputs):
         embeds = self.embedding(inputs).transpose(1, 2)
-        conv = self.conv(embeds)
+        conv = self.conv(self.embedding_dropout(embeds))
         pool = torch.max(conv, dim=-1)[0]
-        out = self.linear(pool)
+        out = self.linear(self.dropout_softmax(pool))
         return torch.nn.functional.log_softmax(out, dim=-1)
 
 
 class ConvMultiGram(BaseModelClass, ABC):
-    def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_features=100, num_categories=2,
-                 name='ConvMultiGram'):
+    def __init__(self, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 dropout=data_hyperparameters.DROPOUT, embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, num_features=data_hyperparameters.NUM_CONV_FEATURES,
+                 num_categories=2, name='ConvMultiGram'):
         super().__init__()
         self.name = name
         self.embedding_dimension = embedding_dimension
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
-        self.dropout = torch.nn.Dropout(p=dropout)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.conv2 = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=num_features, kernel_size=2)
         self.conv3 = torch.nn.Conv1d(in_channels=embedding_dimension, out_channels=num_features, kernel_size=3)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
@@ -199,7 +204,7 @@ class ConvMultiGram(BaseModelClass, ABC):
 
     def forward(self, inputs):
         embeds = self.embedding(inputs).transpose(1, 2)
-        dropped_embeds = self.dropout(embeds)
+        dropped_embeds = self.embedding_dropout(embeds)
         conv2 = self.conv2(dropped_embeds)
         conv3 = self.conv3(dropped_embeds)
         pool1 = torch.max(dropped_embeds, dim=-1)[0]
@@ -212,9 +217,12 @@ class ConvMultiGram(BaseModelClass, ABC):
 
 
 class GRUClassifier(BaseModelClass, ABC):
-    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, hidden_size=100, bidirectional=False,
-                 num_categories=2, use_packing=False, batch_first=True, name='GRU'):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 recurrent_dropout=data_hyperparameters.RECURRENT_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, bidirectional=False, num_categories=2, use_packing=False,
+                 batch_first=True, name='GRU'):
         super().__init__()
         self.bidirectional = bidirectional
         self.max_len = max_len
@@ -226,9 +234,9 @@ class GRUClassifier(BaseModelClass, ABC):
         self.batch_first = batch_first
         self.num_layers = num_layers
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
-        self.dropout = torch.nn.Dropout(p=dropout)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                bidirectional=bidirectional, batch_first=batch_first)
+                                bidirectional=bidirectional, batch_first=batch_first, dropout=recurrent_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
         self.name = name
@@ -237,7 +245,7 @@ class GRUClassifier(BaseModelClass, ABC):
     def forward(self, inputs):
         input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
         embeds = self.embedding(input_truncated)
-        dropped_embeds = self.dropout(embeds)
+        dropped_embeds = self.embedding_dropout(embeds)
         if not self.batch_first:
             dropped_embeds = dropped_embeds.transpose(0, 1)
         if self.use_packing:
@@ -254,9 +262,12 @@ class GRUClassifier(BaseModelClass, ABC):
 
 
 class LSTMClassifier(BaseModelClass, ABC):
-    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, dropout=0.25,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, hidden_size=100, bidirectional=False,
-                 num_categories=2, use_packing=False, batch_first=True, name='LSTM'):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 dropout=data_hyperparameters.DROPOUT, embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT,
+                 recurrent_dropout=data_hyperparameters.RECURRENT_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, bidirectional=False, num_categories=2, use_packing=False,
+                 batch_first=True, name='LSTM'):
         super().__init__()
         self.bidirectional = bidirectional
         self.max_len = max_len
@@ -268,9 +279,9 @@ class LSTMClassifier(BaseModelClass, ABC):
         self.batch_first = batch_first
         self.num_layers = num_layers
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
-        self.dropout = torch.nn.Dropout(p=dropout)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                  bidirectional=bidirectional, batch_first=batch_first)
+                                  bidirectional=bidirectional, batch_first=batch_first, dropout=recurrent_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
         self.name = name
@@ -279,7 +290,7 @@ class LSTMClassifier(BaseModelClass, ABC):
     def forward(self, inputs):
         input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
         embeds = self.embedding(input_truncated)
-        dropped_embeds = self.dropout(embeds)
+        dropped_embeds = self.embedding_dropout(embeds)
         if not self.batch_first:
             dropped_embeds = dropped_embeds.transpose(0, 1)
         if self.use_packing:
@@ -297,7 +308,8 @@ class LSTMClassifier(BaseModelClass, ABC):
 
 class PositionalEncoding(torch.nn.Module):
     # Modified from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
-    def __init__(self, d_model, dropout=0.1, max_len=1000):
+    def __init__(self, d_model, dropout=data_hyperparameters.POSITIONAL_ENCODING_DROPOUT,
+                 max_len=data_hyperparameters.TRANSFORMER_MAX_LEN):
         assert d_model % 2 == 0
         super().__init__()
         self.dropout = torch.nn.Dropout(p=dropout)
@@ -316,8 +328,12 @@ class PositionalEncoding(torch.nn.Module):
 
 
 class TransformerEncoderLayer(BaseModelClass, ABC):
-    def __init__(self, max_len=500, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
-                 dim_feedforward=512, dropout=0.4, positional_encoding_dropout=0.2, mask_pad_tokens=True,
+    def __init__(self, max_len=data_hyperparameters.TRANSFORMER_MAX_LEN,
+                 embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 nhead=data_hyperparameters.TRANSFORMER_NHEAD,
+                 dim_feedforward=data_hyperparameters.TRANSFORMER_DIM_FEEDFORWARD,
+                 dropout=data_hyperparameters.TRANSFORMER_DROPOUT,
+                 positional_encoding_dropout=data_hyperparameters.POSITIONAL_ENCODING_DROPOUT, mask_pad_tokens=True,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='mean', num_categories=2,
                  name='TransformerEncoderLayer'):
         super().__init__()
@@ -358,8 +374,12 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
 
 
 class TransformerEncoder(BaseModelClass, ABC):
-    def __init__(self, num_layers, max_len=500, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION, nhead=4,
-                 dim_feedforward=512, dropout=0.4, positional_encoding_dropout=0.2, mask_pad_tokens=True,
+    def __init__(self, num_layers, max_len=data_hyperparameters.TRANSFORMER_MAX_LEN,
+                 embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 nhead=data_hyperparameters.TRANSFORMER_NHEAD,
+                 dim_feedforward=data_hyperparameters.TRANSFORMER_DIM_FEEDFORWARD,
+                 dropout=data_hyperparameters.TRANSFORMER_DROPOUT,
+                 positional_encoding_dropout=data_hyperparameters.POSITIONAL_ENCODING_DROPOUT, mask_pad_tokens=True,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, pool_type='mean', num_categories=2,
                  name='TransformerEncoder'):
         super().__init__()
