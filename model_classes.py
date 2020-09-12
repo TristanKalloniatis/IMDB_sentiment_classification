@@ -306,6 +306,71 @@ class LSTMClassifier(BaseModelClass, ABC):
         return torch.nn.functional.log_softmax(out, dim=-1)
 
 
+class GRUClassifierWithDotProductAttention(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 recurrent_dropout=data_hyperparameters.RECURRENT_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='GRUWithDotProductAttention'):
+        super().__init__()
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
+        self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                                batch_first=True, dropout=recurrent_dropout)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
+        self.linear = torch.nn.Linear(self.hidden_size, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.embedding_dropout(embeds)
+        gru_output, gru_hn = self.GRU(dropped_embeds)
+        similarity_scores = torch.nn.functional.softmax(torch.bmm(gru_output, gru_hn[-1, :, :].unsqueeze(-1)).squeeze(),
+                                                        dim=-1)
+        gru_final_output = torch.sum(similarity_scores.unsqueeze(-1) * gru_output, dim=1)
+        gru_final_dropout = self.dropout_softmax(gru_final_output)
+        out = self.linear(gru_final_dropout)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class LSTMClassifierWithDotProductAttention(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 recurrent_dropout=data_hyperparameters.RECURRENT_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='LSTMWithDotProductAttention'):
+        super().__init__()
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
+        self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                                  batch_first=True, dropout=recurrent_dropout)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
+        self.linear = torch.nn.Linear(self.hidden_size, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.embedding_dropout(embeds)
+        lstm_output, (lstm_hn, _) = self.LSTM(dropped_embeds)
+        similarity_scores = torch.nn.functional.softmax(torch.bmm(lstm_output, lstm_hn[-1, :, :].unsqueeze(-1)).squeeze(),
+                                                        dim=-1)
+        lstm_final_output = torch.sum(similarity_scores.unsqueeze(-1) * lstm_output, dim=1)
+        lstm_final_dropout = self.dropout_softmax(lstm_final_output)
+        out = self.linear(lstm_final_dropout)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
 class PositionalEncoding(torch.nn.Module):
     # Modified from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
     def __init__(self, d_model, dropout=data_hyperparameters.POSITIONAL_ENCODING_DROPOUT,
