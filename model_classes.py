@@ -265,6 +265,10 @@ class GRUClassifier(BaseModelClass, ABC):
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, bidirectional=False, num_categories=2, use_packing=False,
                  batch_first=True, name='GRU'):
         super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
         self.bidirectional = bidirectional
         self.max_len = max_len
         self.embedding_dimension = embedding_dimension
@@ -314,6 +318,10 @@ class LSTMClassifier(BaseModelClass, ABC):
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, bidirectional=False, num_categories=2, use_packing=False,
                  batch_first=True, name='LSTM'):
         super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
         self.bidirectional = bidirectional
         self.max_len = max_len
         self.embedding_dimension = embedding_dimension
@@ -362,6 +370,10 @@ class GRUClassifierWithDotProductAttention(BaseModelClass, ABC):
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='GRUWithDotProductAttention'):
         super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
         self.max_len = max_len
         self.embedding_dimension = embedding_dimension
         self.hidden_size = hidden_size
@@ -399,6 +411,10 @@ class LSTMClassifierWithDotProductAttention(BaseModelClass, ABC):
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='LSTMWithDotProductAttention'):
         super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
         self.max_len = max_len
         self.embedding_dimension = embedding_dimension
         self.hidden_size = hidden_size
@@ -436,6 +452,10 @@ class GRUClassifierWithBilinearAttention(BaseModelClass, ABC):
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='GRUWithBilinearAttention'):
         super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
         self.max_len = max_len
         self.embedding_dimension = embedding_dimension
         self.hidden_size = hidden_size
@@ -475,6 +495,10 @@ class LSTMClassifierWithBilinearAttention(BaseModelClass, ABC):
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='LSTMWithBilinearAttention'):
         super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
         self.max_len = max_len
         self.embedding_dimension = embedding_dimension
         self.hidden_size = hidden_size
