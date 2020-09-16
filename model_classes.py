@@ -219,7 +219,7 @@ class ConvMultiGram(BaseModelClass, ABC):
 class GRUClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
                  embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
-                 recurrent_dropout=data_hyperparameters.RECURRENT_DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, bidirectional=False, num_categories=2, use_packing=False,
                  batch_first=True, name='GRU'):
@@ -236,7 +236,7 @@ class GRUClassifier(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                bidirectional=bidirectional, batch_first=batch_first, dropout=recurrent_dropout)
+                                bidirectional=bidirectional, batch_first=batch_first, dropout=inter_recurrent_layer_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
         self.name = name
@@ -264,7 +264,7 @@ class GRUClassifier(BaseModelClass, ABC):
 class LSTMClassifier(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
                  dropout=data_hyperparameters.DROPOUT, embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT,
-                 recurrent_dropout=data_hyperparameters.RECURRENT_DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, bidirectional=False, num_categories=2, use_packing=False,
                  batch_first=True, name='LSTM'):
@@ -281,7 +281,7 @@ class LSTMClassifier(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                  bidirectional=bidirectional, batch_first=batch_first, dropout=recurrent_dropout)
+                                  bidirectional=bidirectional, batch_first=batch_first, dropout=inter_recurrent_layer_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size_scaled, num_categories)
         self.name = name
@@ -309,7 +309,7 @@ class LSTMClassifier(BaseModelClass, ABC):
 class GRUClassifierWithDotProductAttention(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
                  embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
-                 recurrent_dropout=data_hyperparameters.RECURRENT_DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='GRUWithDotProductAttention'):
         super().__init__()
@@ -320,7 +320,7 @@ class GRUClassifierWithDotProductAttention(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                batch_first=True, dropout=recurrent_dropout)
+                                batch_first=True, dropout=inter_recurrent_layer_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size, num_categories)
         self.name = name
@@ -342,7 +342,7 @@ class GRUClassifierWithDotProductAttention(BaseModelClass, ABC):
 class LSTMClassifierWithDotProductAttention(BaseModelClass, ABC):
     def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
                  embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
-                 recurrent_dropout=data_hyperparameters.RECURRENT_DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
                  vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='LSTMWithDotProductAttention'):
         super().__init__()
@@ -353,7 +353,7 @@ class LSTMClassifierWithDotProductAttention(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
-                                  batch_first=True, dropout=recurrent_dropout)
+                                  batch_first=True, dropout=inter_recurrent_layer_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
         self.linear = torch.nn.Linear(self.hidden_size, num_categories)
         self.name = name
@@ -370,6 +370,78 @@ class LSTMClassifierWithDotProductAttention(BaseModelClass, ABC):
         lstm_final_dropout = self.dropout_softmax(lstm_final_output)
         out = self.linear(lstm_final_dropout)
         return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class GRUClassifierWithBilinearAttention(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='GRUWithBilinearAttention'):
+        super().__init__()
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
+        self.GRU = torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                                batch_first=True, dropout=inter_recurrent_layer_dropout)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
+        self.bilinear = torch.nn.Bilinear(in1_features=hidden_size, in2_features=hidden_size, out_features=1)
+        self.linear = torch.nn.Linear(self.hidden_size, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        sequence_length = input_truncated.shape[1]
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.embedding_dropout(embeds)
+        gru_output, gru_hn = self.GRU(dropped_embeds)
+        similarity_scores = torch.nn.functional.softmax(self.bilinear(gru_output.contiguous(), gru_hn[-1, :, :].unsqueeze(1).repeat(1, sequence_length, 1)).squeeze(),
+                                                        dim=-1)
+        gru_final_output = torch.sum(similarity_scores.unsqueeze(-1) * gru_output, dim=1)
+        gru_final_dropout = self.dropout_softmax(gru_final_output)
+        out = self.linear(gru_final_dropout)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class LSTMClassifierWithBilinearAttention(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='LSTMWithBilinearAttention'):
+        super().__init__()
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
+        self.LSTM = torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                                  batch_first=True, dropout=inter_recurrent_layer_dropout)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
+        self.bilinear = torch.nn.Bilinear(in1_features=hidden_size, in2_features=hidden_size, out_features=1)
+        self.linear = torch.nn.Linear(self.hidden_size, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        sequence_length = input_truncated.shape[1]
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.embedding_dropout(embeds)
+        lstm_output, (lstm_hn, _) = self.LSTM(dropped_embeds)
+        similarity_scores = torch.nn.functional.softmax(
+            self.bilinear(lstm_output.contiguous(), lstm_hn[-1, :, :].unsqueeze(1).repeat(1, sequence_length, 1)).squeeze(),
+            dim=-1)
+        lstm_final_output = torch.sum(similarity_scores.unsqueeze(-1) * lstm_output, dim=1)
+        lstm_final_dropout = self.dropout_softmax(lstm_final_output)
+        out = self.linear(lstm_final_dropout)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
 
 class PositionalEncoding(torch.nn.Module):
     # Modified from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
