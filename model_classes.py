@@ -35,7 +35,8 @@ def get_accuracy(loader, model, also_report_model_confidences=False):
                 correct_prediction_probs += torch.sum(correct_predictions_mask * probs).item()
                 incorrect_prediction_probs += torch.sum((1 - correct_predictions_mask) * probs).item()
     if also_report_model_confidences:
-        return accuracy / len(loader), correct_prediction_probs / num_correct, incorrect_prediction_probs / num_incorrect
+        return accuracy / len(
+            loader), correct_prediction_probs / num_correct, incorrect_prediction_probs / num_incorrect
     else:
         return accuracy / len(loader)
 
@@ -282,7 +283,8 @@ class GRUClassifier(BaseModelClass, ABC):
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.GRU = WeightDropGRU(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
                                  hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional,
-                                 batch_first=batch_first, dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
+                                 batch_first=batch_first,
+                                 dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
             torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
                          bidirectional=bidirectional, dropout=inter_recurrent_layer_dropout, batch_first=batch_first)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
@@ -335,7 +337,8 @@ class LSTMClassifier(BaseModelClass, ABC):
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.LSTM = WeightDropLSTM(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
                                    hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional,
-                                   batch_first=batch_first, dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
+                                   batch_first=batch_first,
+                                   dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
             torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, bidirectional=bidirectional,
                           num_layers=num_layers, batch_first=batch_first, dropout=inter_recurrent_layer_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
@@ -382,7 +385,8 @@ class GRUClassifierWithDotProductAttention(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.GRU = WeightDropGRU(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
-                                 hidden_size=hidden_size, num_layers=num_layers, batch_first=True, bidirectional=bidirectional,
+                                 hidden_size=hidden_size, num_layers=num_layers, batch_first=True,
+                                 bidirectional=bidirectional,
                                  dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
             torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
                          bidirectional=bidirectional, batch_first=True, dropout=inter_recurrent_layer_dropout)
@@ -428,7 +432,8 @@ class LSTMClassifierWithDotProductAttention(BaseModelClass, ABC):
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.LSTM = WeightDropLSTM(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
                                    hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional,
-                                   batch_first=True, dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
+                                   batch_first=True,
+                                   dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
             torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
                           bidirectional=bidirectional, batch_first=True, dropout=inter_recurrent_layer_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
@@ -444,8 +449,9 @@ class LSTMClassifierWithDotProductAttention(BaseModelClass, ABC):
         lstm_output, (lstm_hn, _) = self.LSTM(dropped_embeds)
         if self.bidirectional:
             lstm_hn = torch.flatten(lstm_hn.view(self.num_layers, 2, -1, self.hidden_size).transpose(1, 2), start_dim=2)
-        similarity_scores = torch.nn.functional.softmax(torch.bmm(lstm_output, lstm_hn[-1, :, :].unsqueeze(-1)).squeeze(),
-                                                        dim=-1)
+        similarity_scores = torch.nn.functional.softmax(
+            torch.bmm(lstm_output, lstm_hn[-1, :, :].unsqueeze(-1)).squeeze(),
+            dim=-1)
         lstm_final_output = torch.sum(similarity_scores.unsqueeze(-1) * lstm_output, dim=1)
         lstm_final_dropout = self.dropout_softmax(lstm_final_output)
         out = self.linear(lstm_final_dropout)
@@ -472,12 +478,14 @@ class GRUClassifierWithBilinearAttention(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.GRU = WeightDropGRU(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
-                                 hidden_size=hidden_size, num_layers=num_layers, batch_first=True, bidirectional=bidirectional,
+                                 hidden_size=hidden_size, num_layers=num_layers, batch_first=True,
+                                 bidirectional=bidirectional,
                                  dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
             torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
                          bidirectional=bidirectional, batch_first=True, dropout=inter_recurrent_layer_dropout)
         self.dropout_softmax = torch.nn.Dropout(p=dropout)
-        self.bilinear = torch.nn.Bilinear(in1_features=2 * hidden_size, in2_features=2 * hidden_size, out_features=1) if bidirectional else \
+        self.bilinear = torch.nn.Bilinear(in1_features=2 * hidden_size, in2_features=2 * hidden_size,
+                                          out_features=1) if bidirectional else \
             torch.nn.Bilinear(in1_features=hidden_size, in2_features=hidden_size, out_features=1)
         self.linear = torch.nn.Linear(2 * hidden_size, num_categories) if bidirectional else \
             torch.nn.Linear(hidden_size, num_categories)
@@ -492,7 +500,10 @@ class GRUClassifierWithBilinearAttention(BaseModelClass, ABC):
         gru_output, gru_hn = self.GRU(dropped_embeds)
         if self.bidirectional:
             gru_hn = torch.flatten(gru_hn.view(self.num_layers, 2, -1, self.hidden_size).transpose(1, 2), start_dim=2)
-        similarity_scores = torch.nn.functional.softmax(self.bilinear(gru_output.contiguous(), gru_hn[-1, :, :].unsqueeze(1).repeat(1, sequence_length, 1)).squeeze(),
+        similarity_scores = torch.nn.functional.softmax(self.bilinear(gru_output.contiguous(),
+                                                                      gru_hn[-1, :, :].unsqueeze(1).repeat(1,
+                                                                                                           sequence_length,
+                                                                                                           1)).squeeze(),
                                                         dim=-1)
         gru_final_output = torch.sum(similarity_scores.unsqueeze(-1) * gru_output, dim=1)
         gru_final_dropout = self.dropout_softmax(gru_final_output)
@@ -505,7 +516,7 @@ class LSTMClassifierWithBilinearAttention(BaseModelClass, ABC):
                  embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
                  inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
                  intra_recurrent_layer_dropout=data_hyperparameters.INTRA_RECURRENT_LAYER_DROPOUT,
-                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, bidirectional = False,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None, bidirectional=False,
                  hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2, name='LSTMWithBilinearAttention'):
         super().__init__()
         self.embedding_dropout_rate = embedding_dropout
@@ -520,7 +531,8 @@ class LSTMClassifierWithBilinearAttention(BaseModelClass, ABC):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
         self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
         self.LSTM = WeightDropLSTM(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
-                                   hidden_size=hidden_size, num_layers=num_layers, batch_first=True, bidirectional=bidirectional,
+                                   hidden_size=hidden_size, num_layers=num_layers, batch_first=True,
+                                   bidirectional=bidirectional,
                                    dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
             torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
                           bidirectional=bidirectional, batch_first=True, dropout=inter_recurrent_layer_dropout)
@@ -542,9 +554,243 @@ class LSTMClassifierWithBilinearAttention(BaseModelClass, ABC):
         if self.bidirectional:
             lstm_hn = torch.flatten(lstm_hn.view(self.num_layers, 2, -1, self.hidden_size).transpose(1, 2), start_dim=2)
         similarity_scores = torch.nn.functional.softmax(
-            self.bilinear(lstm_output.contiguous(), lstm_hn[-1, :, :].unsqueeze(1).repeat(1, sequence_length, 1)).squeeze(),
+            self.bilinear(lstm_output.contiguous(),
+                          lstm_hn[-1, :, :].unsqueeze(1).repeat(1, sequence_length, 1)).squeeze(),
             dim=-1)
         lstm_final_output = torch.sum(similarity_scores.unsqueeze(-1) * lstm_output, dim=1)
+        lstm_final_dropout = self.dropout_softmax(lstm_final_output)
+        out = self.linear(lstm_final_dropout)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class BidirectionalGRUClassifierWithDotProductAttention(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
+                 intra_recurrent_layer_dropout=data_hyperparameters.INTRA_RECURRENT_LAYER_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2,
+                 name='BidirectionalGRUWithDotProductAttention'):
+        super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
+        self.GRU = WeightDropGRU(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
+                                 hidden_size=hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True,
+                                 dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
+            torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                         bidirectional=True, batch_first=True, dropout=inter_recurrent_layer_dropout)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
+        self.linear = torch.nn.Linear(2 * hidden_size, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        sequence_length = input_truncated.shape[1]
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.embedding_dropout(embeds)
+        gru_output, gru_hn = self.GRU(dropped_embeds)
+        gru_output = gru_output.view(-1, sequence_length, 2, self.hidden_size)
+        gru_hn = gru_hn.view(self.num_layers, 2, -1, self.hidden_size)
+        gru_output_forward = gru_output[:, :, 0, :]
+        gru_output_backward = gru_output[:, :, 1, :]
+        gru_hn_forward = gru_hn[:, 0, :, :]
+        gru_hn_backward = gru_hn[:, 1, :, :]
+        similarity_scores_forward = torch.nn.functional.softmax(
+            torch.bmm(gru_output_forward, gru_hn_forward[-1, :, :].unsqueeze(-1)).squeeze(),
+            dim=-1)
+        gru_final_output_forward = torch.sum(similarity_scores_forward.unsqueeze(-1) * gru_output_forward, dim=1)
+        similarity_scores_backward = torch.nn.functional.softmax(
+            torch.bmm(gru_output_backward, gru_hn_backward[-1, :, :].unsqueeze(-1)).squeeze(),
+            dim=-1)
+        gru_final_output_backward = torch.sum(similarity_scores_backward.unsqueeze(-1) * gru_output_backward, dim=1)
+        gru_final_output = torch.cat([gru_final_output_forward, gru_final_output_backward], dim=1)
+        gru_final_dropout = self.dropout_softmax(gru_final_output)
+        out = self.linear(gru_final_dropout)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class BidirectionalLSTMClassifierWithDotProductAttention(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
+                 intra_recurrent_layer_dropout=data_hyperparameters.INTRA_RECURRENT_LAYER_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2,
+                 name='BidirectionalLSTMWithDotProductAttention'):
+        super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
+        self.LSTM = WeightDropLSTM(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
+                                   hidden_size=hidden_size, num_layers=num_layers, bidirectional=True,
+                                   batch_first=True,
+                                   dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
+            torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                          bidirectional=True, batch_first=True, dropout=inter_recurrent_layer_dropout)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
+        self.linear = torch.nn.Linear(2 * hidden_size, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        sequence_length = input_truncated.shape[1]
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.embedding_dropout(embeds)
+        lstm_output, (lstm_hn, _) = self.LSTM(dropped_embeds)
+        lstm_output = lstm_output.view(-1, sequence_length, 2, self.hidden_size)
+        lstm_hn = lstm_hn.view(self.num_layers, 2, -1, self.hidden_size)
+        lstm_output_forward = lstm_output[:, :, 0, :]
+        lstm_output_backward = lstm_output[:, :, 1, :]
+        lstm_hn_forward = lstm_hn[:, 0, :, :]
+        lstm_hn_backward = lstm_hn[:, 1, :, :]
+        similarity_scores_forward = torch.nn.functional.softmax(
+            torch.bmm(lstm_output_forward, lstm_hn_forward[-1, :, :].unsqueeze(-1)).squeeze(),
+            dim=-1)
+        lstm_final_output_forward = torch.sum(similarity_scores_forward.unsqueeze(-1) * lstm_output_forward, dim=1)
+        similarity_scores_backward = torch.nn.functional.softmax(
+            torch.bmm(lstm_output_backward, lstm_hn_backward[-1, :, :].unsqueeze(-1)).squeeze(),
+            dim=-1)
+        lstm_final_output_backward = torch.sum(similarity_scores_backward.unsqueeze(-1) * lstm_output_backward, dim=1)
+        lstm_final_output = torch.cat([lstm_final_output_forward, lstm_final_output_backward], dim=1)
+        lstm_final_dropout = self.dropout_softmax(lstm_final_output)
+        out = self.linear(lstm_final_dropout)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class BidirectionalGRUClassifierWithBilinearAttention(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
+                 intra_recurrent_layer_dropout=data_hyperparameters.INTRA_RECURRENT_LAYER_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2,
+                 name='BidirectionalGRUWithBilinearAttention'):
+        super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
+        self.GRU = WeightDropGRU(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
+                                 hidden_size=hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True,
+                                 dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
+            torch.nn.GRU(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                         bidirectional=True, batch_first=True, dropout=inter_recurrent_layer_dropout)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
+        self.bilinear_forward = torch.nn.Bilinear(in1_features=hidden_size, in2_features=hidden_size, out_features=1)
+        self.bilinear_backward = torch.nn.Bilinear(in1_features=hidden_size, in2_features=hidden_size, out_features=1)
+        self.linear = torch.nn.Linear(2 * hidden_size, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        sequence_length = input_truncated.shape[1]
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.embedding_dropout(embeds)
+        gru_output, gru_hn = self.GRU(dropped_embeds)
+        gru_output = gru_output.view(-1, sequence_length, 2, self.hidden_size)
+        gru_hn = gru_hn.view(self.num_layers, 2, -1, self.hidden_size)
+        gru_output_forward = gru_output[:, :, 0, :]
+        gru_output_backward = gru_output[:, :, 1, :]
+        gru_hn_forward = gru_hn[:, 0, :, :]
+        gru_hn_backward = gru_hn[:, 1, :, :]
+        similarity_scores_forward = torch.nn.functional.softmax(self.bilinear_forward(gru_output_forward.contiguous(), gru_hn_forward[-1, :, :].unsqueeze(1).repeat(1, sequence_length, 1)).squeeze(), dim=-1)
+        gru_final_output_forward = torch.sum(similarity_scores_forward.unsqueeze(-1) * gru_output_forward, dim=1)
+        similarity_scores_backward = torch.nn.functional.softmax(self.bilinear_backward(gru_output_backward.contiguous(),
+                                                                                      gru_hn_backward[-1, :,
+                                                                                      :].unsqueeze(1).repeat(1,
+                                                                                                             sequence_length,
+                                                                                                             1)).squeeze(),
+                                                                dim=-1)
+        gru_final_output_backward = torch.sum(similarity_scores_backward.unsqueeze(-1) * gru_output_backward, dim=1)
+        gru_final_output = torch.cat([gru_final_output_forward, gru_final_output_backward], dim=1)
+        gru_final_dropout = self.dropout_softmax(gru_final_output)
+        out = self.linear(gru_final_dropout)
+        return torch.nn.functional.log_softmax(out, dim=-1)
+
+
+class BidirectionalLSTMClassifierWithBilinearAttention(BaseModelClass, ABC):
+    def __init__(self, num_layers, embedding_dimension=data_hyperparameters.EMBEDDING_DIMENSION,
+                 embedding_dropout=data_hyperparameters.EMBEDDING_DROPOUT, dropout=data_hyperparameters.DROPOUT,
+                 inter_recurrent_layer_dropout=data_hyperparameters.INTER_RECURRENT_LAYER_DROPOUT,
+                 intra_recurrent_layer_dropout=data_hyperparameters.INTRA_RECURRENT_LAYER_DROPOUT,
+                 vocab_size=data_hyperparameters.VOCAB_SIZE + 2, max_len=None,
+                 hidden_size=data_hyperparameters.HIDDEN_SIZE, num_categories=2,
+                 name='BidirectionalLSTMWithBilinearAttention'):
+        super().__init__()
+        self.embedding_dropout_rate = embedding_dropout
+        self.softmax_dropout_rate = dropout
+        self.inter_recurrent_layer_dropout_rate = inter_recurrent_layer_dropout
+        self.intra_recurrent_layer_dropout_rate = intra_recurrent_layer_dropout
+        self.max_len = max_len
+        self.embedding_dimension = embedding_dimension
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dimension)
+        self.embedding_dropout = torch.nn.Dropout(p=embedding_dropout)
+        self.LSTM = WeightDropLSTM(weight_dropout=intra_recurrent_layer_dropout, input_size=embedding_dimension,
+                                   hidden_size=hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True,
+                                   dropout=inter_recurrent_layer_dropout) if intra_recurrent_layer_dropout > 0. else \
+            torch.nn.LSTM(input_size=embedding_dimension, hidden_size=hidden_size, num_layers=num_layers,
+                          bidirectional=True, batch_first=True, dropout=inter_recurrent_layer_dropout)
+        self.dropout_softmax = torch.nn.Dropout(p=dropout)
+        self.bilinear_forward = torch.nn.Bilinear(in1_features=hidden_size, in2_features=hidden_size, out_features=1)
+        self.bilinear_backward = torch.nn.Bilinear(in1_features=hidden_size, in2_features=hidden_size, out_features=1)
+        self.linear = torch.nn.Linear(2 * hidden_size, num_categories)
+        self.name = name
+        self.finish_setup()
+
+    def forward(self, inputs):
+        input_truncated = inputs[:, :self.max_len] if self.max_len is not None else inputs
+        sequence_length = input_truncated.shape[1]
+        embeds = self.embedding(input_truncated)
+        dropped_embeds = self.embedding_dropout(embeds)
+        lstm_output, (lstm_hn, _) = self.LSTM(dropped_embeds)
+        lstm_output = lstm_output.view(-1, sequence_length, 2, self.hidden_size)
+        lstm_hn = lstm_hn.view(self.num_layers, 2, -1, self.hidden_size)
+        lstm_output_forward = lstm_output[:, :, 0, :]
+        lstm_output_backward = lstm_output[:, :, 1, :]
+        lstm_hn_forward = lstm_hn[:, 0, :, :]
+        lstm_hn_backward = lstm_hn[:, 1, :, :]
+        similarity_scores_forward = torch.nn.functional.softmax(self.bilinear_forward(lstm_output_forward.contiguous(),
+                                                                                      lstm_hn_forward[-1, :,
+                                                                                      :].unsqueeze(1).repeat(1,
+                                                                                                             sequence_length,
+                                                                                                             1)).squeeze(),
+                                                                dim=-1)
+        lstm_final_output_forward = torch.sum(similarity_scores_forward.unsqueeze(-1) * lstm_output_forward, dim=1)
+        similarity_scores_backward = torch.nn.functional.softmax(
+            self.bilinear_backward(lstm_output_backward.contiguous(),
+                                   lstm_hn_backward[-1, :,
+                                   :].unsqueeze(1).repeat(1,
+                                                          sequence_length,
+                                                          1)).squeeze(),
+            dim=-1)
+        lstm_final_output_backward = torch.sum(similarity_scores_backward.unsqueeze(-1) * lstm_output_backward, dim=1)
+        lstm_final_output = torch.cat([lstm_final_output_forward, lstm_final_output_backward], dim=1)
         lstm_final_dropout = self.dropout_softmax(lstm_final_output)
         out = self.linear(lstm_final_dropout)
         return torch.nn.functional.log_softmax(out, dim=-1)
@@ -608,7 +854,8 @@ class TransformerEncoderLayer(BaseModelClass, ABC):
                 non_pad_transforms_sum = torch.sum(non_pad * transforms, dim=0)
                 pool = non_pad_transforms_sum / non_pad_sum
             else:
-                masked_transforms = transforms.masked_fill(src_key_padding_mask.transpose(0,1).unsqueeze(-1), -float('inf'))
+                masked_transforms = transforms.masked_fill(src_key_padding_mask.transpose(0, 1).unsqueeze(-1),
+                                                           -float('inf'))
                 pool = torch.max(masked_transforms, dim=0)[0]
         else:
             transforms = self.encoder_layer(positional_encodings)
@@ -655,7 +902,8 @@ class TransformerEncoder(BaseModelClass, ABC):
                 non_pad_transforms_sum = torch.sum(non_pad * transforms, dim=0)
                 pool = non_pad_transforms_sum / non_pad_sum
             else:
-                masked_transforms = transforms.masked_fill(src_key_padding_mask.transpose(0,1).unsqueeze(-1), -float('inf'))
+                masked_transforms = transforms.masked_fill(src_key_padding_mask.transpose(0, 1).unsqueeze(-1),
+                                                           -float('inf'))
                 pool = torch.max(masked_transforms, dim=0)[0]
         else:
             transforms = self.encoder(positional_encodings)
